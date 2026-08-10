@@ -72,6 +72,9 @@ app.get("/api/health", (req, res) => {
     error: state.error,
     loadedAt: state.loadedAt,
     totalRegistros: state.records.length,
+    // El front lo usa para ocultar la carga de Excel cuando el deploy no
+    // tiene disco de escritura (Vercel).
+    cargaHabilitada: !ES_SERVERLESS,
     meta: state.meta,
   });
 });

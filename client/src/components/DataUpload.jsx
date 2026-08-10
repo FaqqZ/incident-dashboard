@@ -8,6 +8,24 @@ import { useDataVersion } from "../store/useDataVersion";
 
 const nf = (n) => (n ?? 0).toLocaleString("es-AR");
 
+// Mismo membrete que el dashboard (versión negativa sobre el navy).
+function Topbar({ children }) {
+  return (
+    <header className="topbar">
+      <div className="brand">
+        <img
+          className="logo"
+          src="/logo-smt-negativo.png"
+          alt="Ciudad SMT · Subsecretaría de Seguridad Ciudadana"
+        />
+        <span className="brand-divider" aria-hidden="true" />
+        <h1>Gestión de Datos</h1>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>{children}</div>
+    </header>
+  );
+}
+
 export default function DataUpload() {
   const { increment } = useDataVersion();
   const [password, setPassword] = useState(() => sessionStorage.getItem("uploadToken") || "");
@@ -31,6 +49,7 @@ export default function DataUpload() {
       setHealth(data);
     } catch (err) {
       console.error("Error loading health:", err);
+      setHealth({ __error: err.message || "No se pudo consultar el estado" });
     }
   };
 
@@ -196,19 +215,32 @@ export default function DataUpload() {
     });
   };
 
-  if (!isAuthenticated) {
+  // El backend avisa si el deploy tiene disco de escritura. En Vercel no lo
+  // tiene, así que la carga de Excel se oculta en vez de fallar al enviar.
+  const cargaHabilitada = health?.cargaHabilitada !== false;
+
+  if (!health) {
     return (
       <div className="app">
-        <header className="topbar">
-          <div className="brand">
-            <div className="mark">SC</div>
-            <div>
-              <h1>Gestión de Datos</h1>
-              <div className="sub">Seguridad Ciudadana · San Miguel de Tucumán</div>
-            </div>
-          </div>
+        <Topbar>
           <Link to="/" className="btn">Volver al dashboard</Link>
-        </header>
+        </Topbar>
+        <main className="canvas">
+          <div className="state">
+            <div className="spinner" />
+            <div className="big">Consultando el estado de los datos…</div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated && cargaHabilitada) {
+    return (
+      <div className="app">
+        <Topbar>
+          <Link to="/" className="btn">Volver al dashboard</Link>
+        </Topbar>
 
         <main className="canvas">
           <div className="panel" style={{ maxWidth: "400px", margin: "40px auto" }}>
@@ -237,25 +269,30 @@ export default function DataUpload() {
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <div className="mark">SC</div>
-          <div>
-            <h1>Gestión de Datos</h1>
-            <div className="sub">Seguridad Ciudadana · San Miguel de Tucumán</div>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+      <Topbar>
+        {cargaHabilitada && (
           <button onClick={handleLogout} className="btn">Cerrar sesión</button>
-          <Link to="/" className="btn primary">Volver al dashboard</Link>
-        </div>
-      </header>
+        )}
+        <Link to="/" className="btn primary">Volver al dashboard</Link>
+      </Topbar>
 
       <main className="canvas">
+        {!cargaHabilitada && (
+          <div className="banner-warning" style={{ marginBottom: 20 }}>
+            <strong>La carga de Excel está deshabilitada en este entorno.</strong>
+            <br />
+            Este deploy corre sobre un disco de solo lectura, así que el archivo
+            viaja dentro de la publicación. Para actualizar los datos hay que
+            reemplazar <code>server/data/incidentes.xlsx</code> y volver a
+            desplegar. Abajo podés verificar qué base está cargada ahora.
+          </div>
+        )}
+
         {/* --- Zona de carga --- */}
+        {cargaHabilitada && (
         <section className="panel" style={{ marginBottom: 20 }}>
           <h3>Carga de archivo Excel</h3>
-          <p className="panel-sub">Subí el archivo con las hojas "bd" y "coordenadas-cam-actualizado"</p>
+          <p className="panel-sub">Subí el archivo con la hoja de incidentes y la de coordenadas de cámaras</p>
           
           <div
             className={`upload-zone ${dragActive ? "drag-active" : ""}`}
@@ -309,9 +346,10 @@ export default function DataUpload() {
             {uploading ? "Subiendo..." : "Subir y actualizar"}
           </button>
         </section>
+        )}
 
         {/* --- Panel de validación --- */}
-        {health && (
+        {!health.__error && (
           <section className="panel" style={{ marginBottom: 20 }}>
             <h3>Validación de datos</h3>
             <p className="panel-sub">Estado actual de la base de datos</p>
@@ -365,7 +403,7 @@ export default function DataUpload() {
               
               <div className="column-mapping">
                 <div className="column-section">
-                  <label>Hoja "bd" (incidentes)</label>
+                  <label>Hoja de incidentes</label>
                   <div className="column-list">
                     {Object.entries(health.meta?.columnasBD || {}).map(([key, value]) => (
                       <div key={key} className={`column-item ${value ? "valid" : "invalid"}`}>
@@ -400,6 +438,7 @@ export default function DataUpload() {
         )}
 
         {/* --- Recarga manual --- */}
+        {cargaHabilitada && (
         <section className="panel">
           <h3>Recarga manual</h3>
           <p className="panel-sub">Si reemplazaste el archivo manualmente en el servidor</p>
@@ -419,6 +458,7 @@ export default function DataUpload() {
             {reloading ? "Recargando..." : "Recargar datos"}
           </button>
         </section>
+        )}
       </main>
     </div>
   );
