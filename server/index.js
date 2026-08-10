@@ -104,8 +104,13 @@ app.get("/api/dashboard", (req, res) => {
 });
 
 // --- Carga de un nuevo Excel (actualización mensual) ---
+// memoryStorage, NO `dest`: multer con `dest` construye un DiskStorage que hace
+// mkdir del directorio en el momento de crearse, no al recibir el archivo. En un
+// filesystem de solo lectura (Vercel) eso tira EROFS al importar el módulo y
+// tumba la función entera, dejando TODA la API en 500. Con el buffer en memoria
+// no se toca el disco hasta que hay algo que guardar.
 const upload = multer({
-  dest: path.join(DATA_DIR, "tmp"),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ok = /\.(xlsx|xls)$/i.test(file.originalname);
@@ -134,8 +139,7 @@ app.post("/api/upload", rechazarSiServerless, requireUploadToken, upload.single(
   if (!req.file) return res.status(400).json({ error: "No se recibió ningún archivo" });
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.copyFileSync(req.file.path, EXCEL_PATH);
-    fs.unlinkSync(req.file.path);
+    fs.writeFileSync(EXCEL_PATH, req.file.buffer);
     reload();
     if (state.error) return res.status(400).json({ error: state.error });
     res.json({ ok: true, totalRegistros: state.records.length, meta: state.meta });
