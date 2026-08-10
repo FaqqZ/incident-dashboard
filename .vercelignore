@@ -1,0 +1,11 @@
+node_modules
+client/node_modules
+server/node_modules
+client/dist
+server/data/tmp
+.claude
+*.log
+.DS_Store
+
+# OJO: server/data/incidentes.xlsx NO va acá. El Excel tiene que subir con el
+# deploy, es la única fuente de datos de la API en Vercel.

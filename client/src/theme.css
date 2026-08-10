@@ -1,0 +1,74 @@
+/* theme.css — sistema de tokens institucional, modo oscuro.
+   Estructura en azul marino (tomado del azul del isotipo Ciudad SMT) y el
+   naranja #ED7D31 reservado para acentos y acciones, que sobre el navy
+   destaca sin competir con los datos. */
+
+:root {
+  /* Marca */
+  --brand: #ed7d31;
+  --brand-600: #f2924f; /* en oscuro el hover ACLARA, no oscurece */
+  --brand-100: rgba(237, 125, 49, 0.28); /* anillo de foco */
+  --brand-050: rgba(237, 125, 49, 0.12); /* cursor/hover de gráficos */
+
+  /* Azul institucional (isotipo) — disponible para acentos secundarios */
+  --azul: #0b5ff0;
+  --celeste: #3bb8f5;
+  --amarillo: #f5c400;
+
+  /* Superficies */
+  --bg: #0b1a2e; /* fondo de página, el más profundo */
+  --surface: #132b47; /* paneles, topbar */
+  --surface-2: #1b3757; /* inputs, superficies secundarias */
+  --surface-3: #24456b; /* hover de botones */
+  --border: #24456b;
+
+  /* Texto */
+  --ink: #eaf1fa;
+  --ink-2: #a8bdd6;
+  --ink-3: #8aa3bf;
+
+  /* Datos: secuencia categórica recalibrada para fondo oscuro.
+     Las del tema claro quedaban embarradas sobre el navy. */
+  --c1: #f0873f;
+  --c2: #4fb3d9;
+  --c3: #a78bfa;
+  --c4: #5fd3a0;
+  --c5: #ff6b7f;
+  --c6: #f5c563;
+  --c7: #6e9be0;
+  --c8: #c79be0;
+
+  /* Estados (fondos translúcidos: se apoyan en la superficie de abajo) */
+  --ok-bg: rgba(95, 211, 160, 0.12);
+  --ok-border: rgba(95, 211, 160, 0.35);
+  --ok-ink: #9be9c4;
+  --warn-bg: rgba(245, 197, 99, 0.12);
+  --warn-border: rgba(245, 197, 99, 0.35);
+  --warn-ink: #f7d89a;
+  --err-bg: rgba(255, 107, 127, 0.13);
+  --err-border: rgba(255, 107, 127, 0.38);
+  --err-ink: #ffaeb8;
+
+  /* Sistema */
+  --radius: 14px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --font: "Poppins", system-ui, -apple-system, sans-serif;
+
+  /* Hace que los controles nativos (date pickers, selects, scrollbars)
+     se rendericen oscuros. Sin esto los inputs de fecha quedan blancos. */
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
