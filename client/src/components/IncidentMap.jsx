@@ -2,7 +2,7 @@
 // Dos modos: calor (peso = cantidad de incidentes) y burbujas (tamaño = cantidad),
 // replicando el mapa de Power BI con Size = Recuento de dispositivo.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet.heat";
@@ -24,16 +24,16 @@ const TOP_N = 10;
 
 const nfMapa = (n) => (n ?? 0).toLocaleString("es-AR");
 
-// Umbrales y colores por defecto para el gradiente.
-// Calibrados para el mapa CLARO: el resto del tablero es oscuro, pero el mapa
-// se mantiene con tiles claros a propósito.
-const DEFAULT_GRADIENT = [
-  { threshold: 0.2, color: "#2f6f8f" },
-  { threshold: 0.4, color: "#4c9f70" },
-  { threshold: 0.6, color: "#e0a458" },
-  { threshold: 0.8, color: "#ed7d31" },
-  { threshold: 1.0, color: "#d1495b" },
-];
+// Colores del gradiente, de menor a mayor concentración. Calibrados para el
+// mapa CLARO: el resto del tablero es oscuro, pero el mapa no.
+const COLORES = ["#2f6f8f", "#4c9f70", "#e0a458", "#ed7d31", "#d1495b"];
+
+const ETIQUETAS_BANDA = ["Bajo", "Moderado", "Elevado", "Alto", "Crítico"];
+
+// Los umbrales NO son números elegidos a dedo: son cuantiles de la distribución
+// real de incidentes por cámara. Así "crítico" significa algo concreto —el 2%
+// de las cámaras con más carga— en vez de un 0,8 arbitrario que no dice nada.
+const CUANTILES = [0.5, 0.8, 0.92, 0.98];
 
 // Cómo se traduce la cantidad de incidentes a "peso" del punto.
 // Antes había un techo FIJO (35) y rompía el mapa en las dos direcciones:
@@ -48,6 +48,61 @@ const HEAT_MIN_OPACITY = 0.4; // PISO: intensidad mínima visible
 // Cantidad de incidentes de un punto según la categoría activa del mapa.
 function cuentaDe(p, category) {
   return category && category !== "all" ? (p.porCategoria?.[category] || 0) : p.count;
+}
+
+// Peso de un punto: log normalizado al máximo del conjunto filtrado.
+function pesoDe(count, maxCount) {
+  return WEIGHT_MIN + (1 - WEIGHT_MIN) * (Math.log1p(count) / (Math.log1p(maxCount) || 1));
+}
+
+// Deriva los umbrales del gradiente y las bandas de la leyenda a partir de la
+// distribución real. Devuelve también los cortes en incidentes, que es lo que
+// permite decir "de tal número para arriba es crítico".
+function escalaDesdeDatos(points, category) {
+  const counts = points
+    .map((p) => cuentaDe(p, category))
+    .filter((c) => c > 0)
+    .sort((a, b) => a - b);
+  if (!counts.length) return null;
+
+  const maxCount = counts[counts.length - 1];
+  const cuantil = (q) => counts[Math.min(counts.length - 1, Math.round(q * (counts.length - 1)))];
+  const cortes = CUANTILES.map(cuantil);
+
+  // Umbrales estrictamente crecientes: con muchos conteos repetidos (por
+  // ejemplo un montón de cámaras con 1 incidente) dos cuantiles pueden caer en
+  // el mismo valor y el gradiente de leaflet.heat se rompe.
+  let previo = 0;
+  const gradient = cortes.map((c, i) => {
+    const t = Math.min(0.98, Math.max(previo + 0.04, +pesoDe(c, maxCount).toFixed(2)));
+    previo = t;
+    return { threshold: t, color: COLORES[i] };
+  });
+  gradient.push({ threshold: 1, color: COLORES[4] });
+
+  // Bandas para la leyenda, en incidentes. Se descartan las que quedan vacías
+  // cuando varios cuantiles coinciden (pasa con categorías chicas, donde
+  // medio padrón de cámaras tiene 1 solo incidente).
+  const rangos = [];
+  let desde = 1;
+  cortes.forEach((corte) => {
+    if (corte >= desde) {
+      rangos.push({ desde, hasta: corte });
+      desde = corte + 1;
+    }
+  });
+  if (maxCount >= desde) rangos.push({ desde, hasta: maxCount });
+
+  // Colores y etiquetas se asignan desde el final: la banda más alta siempre
+  // tiene que leerse como "Crítico", aunque se hayan colapsado bandas.
+  const off = COLORES.length - rangos.length;
+  const bandas = rangos.map((r, i) => ({
+    ...r,
+    color: COLORES[off + i],
+    etiqueta: ETIQUETAS_BANDA[off + i],
+  }));
+
+  return { gradient, bandas, maxCount, camaras: counts.length };
 }
 
 // leaflet.heat dibuja sobre un canvas del tamaño del mapa y llama a getImageData.
@@ -98,14 +153,12 @@ function HeatLayer({ points, blur, radius, intensity, category, gradient }) {
     // Techo adaptativo: el punto más cargado del conjunto FILTRADO siempre
     // llega al tope del gradiente, con o sin categoría puesta.
     const maxCount = points.reduce((m, p) => Math.max(m, cuentaDe(p, category)), 0);
-    const denom = Math.log1p(maxCount) || 1;
 
     const heatData = points
       .map((p) => {
         const count = cuentaDe(p, category);
         if (count === 0) return null; // Excluir puntos sin incidentes de esta categoría
-        const w = WEIGHT_MIN + (1 - WEIGHT_MIN) * (Math.log1p(count) / denom);
-        return [p.lat, p.lng, w];
+        return [p.lat, p.lng, pesoDe(count, maxCount)];
       })
       .filter(Boolean); // Remover nulls
     
@@ -196,15 +249,49 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
   // La opción "Principal" sigue disponible para desglosar a mano.
   const [categoryMode, setCategoryMode] = useState("manual");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [gradient, setGradient] = useState(DEFAULT_GRADIENT);
+  const [gradient, setGradient] = useState([]);
+  // Mientras nadie toque los sliders de umbral, mandan los datos.
+  const [umbralesManuales, setUmbralesManuales] = useState(false);
   const [showUmbrales, setShowUmbrales] = useState(false);
   const [pantallaCompleta, setPantallaCompleta] = useState(false);
   const [mostrarTop, setMostrarTop] = useState(false);
+  const [ajustesAbiertos, setAjustesAbiertos] = useState(false);
 
-  // Esc para salir, y se bloquea el scroll del fondo mientras está expandido.
+  // En pantalla completa los sliders quedan escondidos por defecto: ocupaban
+  // casi 400 px y al mapa le sobraban 300, justo lo contrario de lo buscado.
+  // La leyenda sí queda siempre, que es lo que permite leer el mapa.
+  const controlesVisibles = !pantallaCompleta || ajustesAbiertos;
+
+  const contenedorRef = useRef(null);
+
+  // Pantalla completa REAL (Fullscreen API): usa todo el monitor y esconde la
+  // barra del navegador. Si el navegador la rechaza se cae al overlay CSS, que
+  // igual ocupa toda la ventana.
+  const alternarPantallaCompleta = () => {
+    const el = contenedorRef.current;
+    if (!document.fullscreenElement) {
+      el?.requestFullscreen?.().catch(() => setPantallaCompleta(true));
+      setPantallaCompleta(true);
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+      setPantallaCompleta(false);
+    }
+  };
+
+  // El usuario puede salir con F11 o Esc sin pasar por el botón: hay que
+  // escuchar al navegador para no quedar con el estado desincronizado.
+  useEffect(() => {
+    const onFsChange = () => setPantallaCompleta(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
   useEffect(() => {
     if (!pantallaCompleta) return;
-    const onKey = (e) => e.key === "Escape" && setPantallaCompleta(false);
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (!document.fullscreenElement) setPantallaCompleta(false);
+    };
     const overflowPrevio = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKey);
@@ -226,6 +313,19 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
   const currentCategory = categoryMode === "auto"
     ? (categoriaPrincipal || "all")
     : selectedCategory;
+
+  // Escala derivada de los datos visibles: umbrales del gradiente + bandas de
+  // la leyenda, en incidentes.
+  const escala = useMemo(
+    () => escalaDesdeDatos(points, currentCategory),
+    [points, currentCategory]
+  );
+
+  // Mientras el usuario no toque los umbrales a mano, siguen a los datos.
+  useEffect(() => {
+    if (umbralesManuales || !escala) return;
+    setGradient(escala.gradient.map((g) => ({ ...g })));
+  }, [escala, umbralesManuales]);
 
   // Puntos ordenados por carga según la categoría activa. Se recalculan con
   // cada cambio de filtro, así lo que se señala coincide con las barras.
@@ -252,14 +352,17 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
     setIntensity(DEFAULT_INTENSITY);
   };
 
+  // Vuelve a los umbrales derivados de los datos actuales.
   const resetGradient = () => {
-    setGradient(DEFAULT_GRADIENT.map((g) => ({ ...g })));
+    setUmbralesManuales(false);
+    if (escala) setGradient(escala.gradient.map((g) => ({ ...g })));
   };
 
   const handleThresholdChange = (index, newValue) => {
+    setUmbralesManuales(true);
     const value = Math.round(newValue / 0.05) * 0.05; // Step de 0.05
     const clamped = Math.max(0, Math.min(1, value));
-    
+
     setGradient((prev) => {
       const newGradient = [...prev];
       
@@ -282,6 +385,7 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
   };
 
   const handleColorChange = (index, newColor) => {
+    setUmbralesManuales(true);
     setGradient((prev) => {
       const newGradient = [...prev];
       newGradient[index] = { ...newGradient[index], color: newColor };
@@ -307,7 +411,7 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
   };
 
   return (
-    <div className={pantallaCompleta ? "map-wrap map-fs" : "map-wrap"}>
+    <div ref={contenedorRef} className={pantallaCompleta ? "map-wrap map-fs" : "map-wrap"}>
       <div className="map-bar">
         <div className="map-toggle" role="tablist" aria-label="Modo de mapa">
           <button className={mode === "heat" ? "active" : ""} onClick={() => setMode("heat")}
@@ -322,14 +426,20 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
               onChange={(e) => setMostrarTop(e.target.checked)} />
             Etiquetar los {TOP_N} puntos más críticos
           </label>
-          <button className="btn" onClick={() => setPantallaCompleta((v) => !v)}
+          {pantallaCompleta && mode === "heat" && (
+            <button className="btn" onClick={() => setAjustesAbiertos((v) => !v)}
+              aria-pressed={ajustesAbiertos}>
+              {ajustesAbiertos ? "Ocultar ajustes" : "Ajustes"}
+            </button>
+          )}
+          <button className="btn" onClick={alternarPantallaCompleta}
             aria-pressed={pantallaCompleta}>
             {pantallaCompleta ? "Salir de pantalla completa (Esc)" : "Pantalla completa"}
           </button>
         </div>
       </div>
 
-      {mode === "heat" && (
+      {mode === "heat" && controlesVisibles && (
         <div className="heat-controls">
           <div className="control-row">
             <label>Categoría</label>
@@ -447,6 +557,27 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Leyenda: traduce cada color a un rango de incidentes. Sin esto el mapa
+          es bonito pero no se puede decir qué es crítico y qué no. */}
+      {mode === "heat" && escala && escala.bandas.length > 0 && (
+        <div className="heat-legend">
+          <span className="heat-legend-title">
+            Incidentes por cámara{umbralesManuales ? " · umbrales manuales" : ""}
+          </span>
+          <div className="heat-legend-bands">
+            {escala.bandas.map((b) => (
+              <span className="heat-band" key={b.etiqueta}>
+                <span className="heat-band-dot" style={{ background: b.color }} />
+                <b>{b.etiqueta}</b>
+                <span className="heat-band-rango">
+                  {b.desde === b.hasta ? nfMapa(b.desde) : `${nfMapa(b.desde)}–${nfMapa(b.hasta)}`}
+                </span>
+              </span>
+            ))}
           </div>
         </div>
       )}
