@@ -10,7 +10,10 @@ import {
   ResponsiveContainer,
   Cell,
   CartesianGrid,
+  LabelList,
 } from "recharts";
+
+const nf = (v) => (v ?? 0).toLocaleString("es-AR");
 import { useFilters } from "../store/useFilters";
 import { useNarrowScreen } from "../hooks/useNarrowScreen";
 
@@ -33,7 +36,8 @@ export default function CategoryBarChart({ data }) {
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} layout="vertical" margin={{ left: 8, right: 24 }}>
+      {/* right holgado: la etiqueta de valor va del lado de afuera de la barra */}
+      <BarChart data={data} layout="vertical" margin={{ left: 8, right: 64 }}>
         <CartesianGrid horizontal={false} stroke="var(--border)" />
         <XAxis type="number" tick={{ fontSize: 12, fill: "var(--ink-3)" }} allowDecimals={false} />
         <YAxis
@@ -58,9 +62,12 @@ export default function CategoryBarChart({ data }) {
           dataKey="value"
           radius={[0, 6, 6, 0]}
           maxBarSize={34}
+          isAnimationActive={false}
           cursor="pointer"
           onClick={(d) => toggleFilter("categoria", d.name)}
         >
+          <LabelList dataKey="value" position="right" offset={8}
+            formatter={nf} style={{ fill: "var(--ink)", fontSize: 12, fontWeight: 600 }} />
           {data.map((entry, i) => {
             const active = !filters.categoria || filters.categoria === entry.name;
             return (

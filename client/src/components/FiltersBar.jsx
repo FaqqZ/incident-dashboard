@@ -1,33 +1,27 @@
-// FiltersBar.jsx — slicers: categoría, turno, mes y rango de fechas (modo "Entre").
+// FiltersBar.jsx — slicers: naturaleza, categoría, mes y rango de fechas.
+// El orden de los campos es el pedido por Seguridad Ciudadana: se arranca por
+// naturaleza (Seguridad / Municipal) porque es la que más recorta la base.
 import { useFilters } from "../store/useFilters";
 
 export default function FiltersBar({ options }) {
   const { filters, setFilter, reset, hasActiveFilters } = useFilters();
-  const { categorias = [], turnos = [], meses = [], naturalezas = [], rangoFechas = {} } = options || {};
+  const { categorias = [], meses = [], naturalezas = [], rangoFechas = {} } = options || {};
 
   return (
     <div className="filters" id="filtros-bar">
-      <div className="field">
-        <label htmlFor="f-cat">Categoría</label>
-        <select id="f-cat" value={filters.categoria} onChange={(e) => setFilter("categoria", e.target.value)}>
-          <option value="">Todas</option>
-          {categorias.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
-
-      <div className="field">
-        <label htmlFor="f-turno">Turno</label>
-        <select id="f-turno" value={filters.turno} onChange={(e) => setFilter("turno", e.target.value)}>
-          <option value="">Todos</option>
-          {turnos.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-      </div>
-
       <div className="field">
         <label htmlFor="f-naturaleza">Naturaleza</label>
         <select id="f-naturaleza" value={filters.naturaleza} onChange={(e) => setFilter("naturaleza", e.target.value)}>
           <option value="">Todas</option>
           {naturalezas.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </div>
+
+      <div className="field">
+        <label htmlFor="f-cat">Categoría</label>
+        <select id="f-cat" value={filters.categoria} onChange={(e) => setFilter("categoria", e.target.value)}>
+          <option value="">Todas</option>
+          {categorias.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 

@@ -3,7 +3,7 @@
 // replicando el mapa de Power BI con Size = Recuento de dispositivo.
 
 import { useEffect, useRef, useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet.heat";
 
@@ -26,10 +26,20 @@ const DEFAULT_GRADIENT = [
   { threshold: 1.0, color: "#d1495b" },
 ];
 
-// Cómo se traduce la cantidad de incidentes a "peso" del punto:
-const COUNT_CEIL = 35;        // conteos >= a esto ya son intensidad máxima (bajalo para saturar antes)
-const WEIGHT_MIN = 0.25;      // peso mínimo, para que hasta 1 incidente se note
+// Cómo se traduce la cantidad de incidentes a "peso" del punto.
+// Antes había un techo FIJO (35) y rompía el mapa en las dos direcciones:
+//   · sin filtro el máximo real es 7.619 y la mediana 21, así que 145 de 480
+//     puntos (30%) saturaban: el punto crítico se veía igual que un tercio del mapa;
+//   · con una categoría puesta los conteos caen a 3-14 y NADA llegaba a destacarse.
+// Ahora el techo es el máximo del conjunto filtrado y la escala es logarítmica,
+// que reparte mucho mejor una distribución tan asimétrica.
+const WEIGHT_MIN = 0.15;      // piso, para que hasta 1 incidente se note
 const HEAT_MIN_OPACITY = 0.4; // PISO: intensidad mínima visible
+
+// Cantidad de incidentes de un punto según la categoría activa del mapa.
+function cuentaDe(p, category) {
+  return category && category !== "all" ? (p.porCategoria?.[category] || 0) : p.count;
+}
 
 // leaflet.heat dibuja sobre un canvas del tamaño del mapa y llama a getImageData.
 // Si el contenedor todavía mide 0 (pestaña oculta, panel colapsado, montaje antes
@@ -76,14 +86,16 @@ function HeatLayer({ points, blur, radius, intensity, category, gradient }) {
       gradientObj[g.threshold] = g.color;
     });
     
-    // peso por punto: según categoría seleccionada o total
+    // Techo adaptativo: el punto más cargado del conjunto FILTRADO siempre
+    // llega al tope del gradiente, con o sin categoría puesta.
+    const maxCount = points.reduce((m, p) => Math.max(m, cuentaDe(p, category)), 0);
+    const denom = Math.log1p(maxCount) || 1;
+
     const heatData = points
       .map((p) => {
-        const count = category && category !== "all" 
-          ? (p.porCategoria?.[category] || 0)
-          : p.count;
+        const count = cuentaDe(p, category);
         if (count === 0) return null; // Excluir puntos sin incidentes de esta categoría
-        const w = WEIGHT_MIN + (1 - WEIGHT_MIN) * Math.min(count, COUNT_CEIL) / COUNT_CEIL;
+        const w = WEIGHT_MIN + (1 - WEIGHT_MIN) * (Math.log1p(count) / denom);
         return [p.lat, p.lng, w];
       })
       .filter(Boolean); // Remover nulls
@@ -169,7 +181,11 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
   const [blur, setBlur] = useState(DEFAULT_BLUR);
   const [radius, setRadius] = useState(DEFAULT_RADIUS);
   const [intensity, setIntensity] = useState(DEFAULT_INTENSITY);
-  const [categoryMode, setCategoryMode] = useState("auto"); // "auto" = seguir principal, "manual" = selección manual
+  // Arranca en "todas" y no en la categoría principal: si el mapa se autofiltra
+  // a una categoría mientras los KPIs y las barras muestran el total, los
+  // números no coinciden (el punto top daba 7.579 en el mapa y 7.619 en el KPI).
+  // La opción "Principal" sigue disponible para desglosar a mano.
+  const [categoryMode, setCategoryMode] = useState("manual");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [gradient, setGradient] = useState(DEFAULT_GRADIENT);
   const [showUmbrales, setShowUmbrales] = useState(false);
@@ -183,9 +199,17 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
   ).sort();
 
   // Determinar categoría actual a usar
-  const currentCategory = categoryMode === "auto" 
+  const currentCategory = categoryMode === "auto"
     ? (categoriaPrincipal || "all")
     : selectedCategory;
+
+  // Punto con más incidentes según la categoría activa del mapa. Se recalcula
+  // con cada cambio de filtro, así lo que se señala coincide con las barras.
+  const puntoCritico = points.reduce((mejor, p) => {
+    const cuenta = cuentaDe(p, currentCategory);
+    if (cuenta <= 0) return mejor;
+    return !mejor || cuenta > mejor.cuenta ? { ...p, cuenta } : mejor;
+  }, null);
 
   // Resetear a modo auto cuando cambia categoriaPrincipal (filtros globales)
   useEffect(() => {
@@ -392,8 +416,23 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
           {points.length > 0 && <FitBounds points={points} />}
           <MapResizer />
+          {/* El punto más cargado queda señalado con etiqueta fija: sobre la
+              mancha de calor, un pico aislado se confunde con un cluster denso. */}
+          {mode === "heat" && puntoCritico && (
+            <CircleMarker
+              center={[puntoCritico.lat, puntoCritico.lng]}
+              radius={9}
+              pathOptions={{ color: "#111", weight: 3, fillColor: "#fff", fillOpacity: 0.95 }}
+            >
+              <Tooltip permanent direction="top" offset={[0, -10]} className="tooltip-critico">
+                <b>{puntoCritico.direccion}</b>
+                <br />
+                {puntoCritico.cuenta} incidente{puntoCritico.cuenta === 1 ? "" : "s"}
+              </Tooltip>
+            </CircleMarker>
+          )}
           {mode === "heat" && points.length > 0 && (
-            <HeatLayer 
+            <HeatLayer
               points={points} 
               blur={blur} 
               radius={radius} 

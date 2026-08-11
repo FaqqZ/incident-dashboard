@@ -2,8 +2,10 @@
 // Equivale al gráfico de barras del Power BI: Eje Y = DIRECCION, X = recuento.
 
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid, LabelList,
 } from "recharts";
+
+const nf = (v) => (v ?? 0).toLocaleString("es-AR");
 import { useNarrowScreen } from "../hooks/useNarrowScreen";
 
 export default function RankingChart({ data }) {
@@ -16,7 +18,7 @@ export default function RankingChart({ data }) {
   }
   return (
     <ResponsiveContainer width="100%" height={Math.max(360, data.length * 40)}>
-      <BarChart data={data} layout="vertical" margin={{ left: 8, right: 32 }}>
+      <BarChart data={data} layout="vertical" margin={{ left: 8, right: 64 }}>
         <CartesianGrid horizontal={false} stroke="var(--border)" />
         <XAxis type="number" tick={{ fontSize: 12, fill: "var(--ink-3)" }} allowDecimals={false} />
         <YAxis type="category" dataKey="name" width={narrow ? 130 : 280}
@@ -27,7 +29,9 @@ export default function RankingChart({ data }) {
             background: "var(--surface-2)" }}
           labelStyle={{ color: "var(--ink-2)" }} itemStyle={{ color: "var(--ink)" }}
           formatter={(v) => [v, "Incidentes"]} />
-        <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={26}>
+        <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={26} isAnimationActive={false}>
+          <LabelList dataKey="value" position="right" offset={8}
+            formatter={nf} style={{ fill: "var(--ink)", fontSize: 12, fontWeight: 600 }} />
           {data.map((_, i) => (
             <Cell key={i} fill={i === 0 ? "var(--c5)" : "var(--brand)"}
               fillOpacity={i === 0 ? 1 : 0.55 + (0.45 * (data.length - i)) / data.length} />

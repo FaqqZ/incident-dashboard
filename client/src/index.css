@@ -385,6 +385,29 @@
   color: #d96b22;
 }
 
+/* Etiqueta fija del punto crítico sobre el mapa de calor */
+.leaflet-tooltip.tooltip-critico {
+  font-family: var(--font);
+  font-size: 12px;
+  line-height: 1.35;
+  color: #1f2733;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #cfd6e0;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  padding: 6px 9px;
+  white-space: nowrap;
+}
+
+.leaflet-tooltip.tooltip-critico b {
+  color: #d96b22;
+}
+
+/* la flechita del tooltip tiene que seguir al fondo claro */
+.leaflet-tooltip.tooltip-critico.leaflet-tooltip-top::before {
+  border-top-color: rgba(255, 255, 255, 0.96);
+}
+
 /* --- Upload zone --- */
 .upload-zone {
   border: 2px dashed var(--border);
