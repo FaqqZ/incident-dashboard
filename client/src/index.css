@@ -305,6 +305,65 @@
   border: 1px solid var(--border);
 }
 
+/* --- Mapa: barra de acciones y modo pantalla completa --- */
+.map-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.map-bar-acciones {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.map-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.map-check input {
+  accent-color: var(--brand);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+/* El mapa se despega del flujo y ocupa toda la ventana. Es un div propio del
+   componente, así no depende de la estructura del panel que lo contiene. */
+.map-fs {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: var(--bg);
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+/* En pantalla completa el mapa se come todo el alto sobrante */
+.map-fs .map-shell {
+  flex: 1;
+  height: auto;
+  min-height: 320px;
+}
+
+.map-fs .heat-controls {
+  flex-shrink: 0;
+}
+
 .map-toggle {
   display: inline-flex;
   gap: 4px;
@@ -406,6 +465,76 @@
 /* la flechita del tooltip tiene que seguir al fondo claro */
 .leaflet-tooltip.tooltip-critico.leaflet-tooltip-top::before {
   border-top-color: rgba(255, 255, 255, 0.96);
+}
+
+/* Chapita con el número de ranking, centrada dentro del marcador */
+.leaflet-tooltip.badge-top {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 700;
+  color: #111;
+  pointer-events: none;
+}
+
+.leaflet-tooltip.badge-top::before {
+  display: none;
+}
+
+/* --- Leyenda del top de puntos críticos --- */
+.top-legend {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 6px 16px;
+}
+
+.top-legend li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  min-width: 0;
+}
+
+.top-rank {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.top-dir {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-num {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 /* --- Upload zone --- */

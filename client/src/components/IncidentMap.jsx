@@ -10,10 +10,19 @@ import "leaflet.heat";
 const CENTRO = [-26.8241, -65.2226]; // San Miguel de Tucumán
 const ZOOM = 13;
 
-// Valores por defecto para los sliders
-const DEFAULT_BLUR = 15;
-const DEFAULT_RADIUS = 30;
+// Valores por defecto para los sliders.
+// Radio y difuminado bajaron (eran 30 y 15): el radio de leaflet.heat se mide
+// en PÍXELES de pantalla, no en metros, así que con 30 px las ~480 cámaras del
+// centro se fundían en una sola mancha al zoom inicial. Con 18 px los focos se
+// distinguen sin tener que acercarse.
+const DEFAULT_BLUR = 10;
+const DEFAULT_RADIUS = 18;
 const DEFAULT_INTENSITY = 60;
+
+// Cuántos puntos se etiquetan cuando se pide ver el ranking sobre el mapa.
+const TOP_N = 10;
+
+const nfMapa = (n) => (n ?? 0).toLocaleString("es-AR");
 
 // Umbrales y colores por defecto para el gradiente.
 // Calibrados para el mapa CLARO: el resto del tablero es oscuro, pero el mapa
@@ -189,6 +198,21 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [gradient, setGradient] = useState(DEFAULT_GRADIENT);
   const [showUmbrales, setShowUmbrales] = useState(false);
+  const [pantallaCompleta, setPantallaCompleta] = useState(false);
+  const [mostrarTop, setMostrarTop] = useState(false);
+
+  // Esc para salir, y se bloquea el scroll del fondo mientras está expandido.
+  useEffect(() => {
+    if (!pantallaCompleta) return;
+    const onKey = (e) => e.key === "Escape" && setPantallaCompleta(false);
+    const overflowPrevio = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflowPrevio;
+    };
+  }, [pantallaCompleta]);
   const max = points.reduce((m, p) => Math.max(m, p.count), 1);
 
   // Extraer categorías disponibles de los puntos
@@ -203,13 +227,17 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
     ? (categoriaPrincipal || "all")
     : selectedCategory;
 
-  // Punto con más incidentes según la categoría activa del mapa. Se recalcula
-  // con cada cambio de filtro, así lo que se señala coincide con las barras.
-  const puntoCritico = points.reduce((mejor, p) => {
-    const cuenta = cuentaDe(p, currentCategory);
-    if (cuenta <= 0) return mejor;
-    return !mejor || cuenta > mejor.cuenta ? { ...p, cuenta } : mejor;
-  }, null);
+  // Puntos ordenados por carga según la categoría activa. Se recalculan con
+  // cada cambio de filtro, así lo que se señala coincide con las barras.
+  const puntosOrdenados = points
+    .map((p) => ({ ...p, cuenta: cuentaDe(p, currentCategory) }))
+    .filter((p) => p.cuenta > 0)
+    .sort((a, b) => b.cuenta - a.cuenta);
+
+  // Sin la opción activada se marca solo el #1; con ella, el top N. Sobre la
+  // mancha de calor un pico aislado se confunde con un cluster denso, así que
+  // los números hay que poder leerlos.
+  const puntosMarcados = mostrarTop ? puntosOrdenados.slice(0, TOP_N) : puntosOrdenados.slice(0, 1);
 
   // Resetear a modo auto cuando cambia categoriaPrincipal (filtros globales)
   useEffect(() => {
@@ -279,12 +307,26 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
   };
 
   return (
-    <div>
-      <div className="map-toggle" role="tablist" aria-label="Modo de mapa">
-        <button className={mode === "heat" ? "active" : ""} onClick={() => setMode("heat")}
-          role="tab" aria-selected={mode === "heat"}>Mapa de calor</button>
-        <button className={mode === "bubbles" ? "active" : ""} onClick={() => setMode("bubbles")}
-          role="tab" aria-selected={mode === "bubbles"}>Burbujas</button>
+    <div className={pantallaCompleta ? "map-wrap map-fs" : "map-wrap"}>
+      <div className="map-bar">
+        <div className="map-toggle" role="tablist" aria-label="Modo de mapa">
+          <button className={mode === "heat" ? "active" : ""} onClick={() => setMode("heat")}
+            role="tab" aria-selected={mode === "heat"}>Mapa de calor</button>
+          <button className={mode === "bubbles" ? "active" : ""} onClick={() => setMode("bubbles")}
+            role="tab" aria-selected={mode === "bubbles"}>Burbujas</button>
+        </div>
+
+        <div className="map-bar-acciones">
+          <label className="map-check">
+            <input type="checkbox" checked={mostrarTop}
+              onChange={(e) => setMostrarTop(e.target.checked)} />
+            Etiquetar los {TOP_N} puntos más críticos
+          </label>
+          <button className="btn" onClick={() => setPantallaCompleta((v) => !v)}
+            aria-pressed={pantallaCompleta}>
+            {pantallaCompleta ? "Salir de pantalla completa (Esc)" : "Pantalla completa"}
+          </button>
+        </div>
       </div>
 
       {mode === "heat" && (
@@ -416,21 +458,37 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
           {points.length > 0 && <FitBounds points={points} />}
           <MapResizer />
-          {/* El punto más cargado queda señalado con etiqueta fija: sobre la
-              mancha de calor, un pico aislado se confunde con un cluster denso. */}
-          {mode === "heat" && puntoCritico && (
+          {/* Con el top N las direcciones se encimaban (los focos están todos en
+              el centro), así que sobre el mapa va solo el número y el detalle
+              se lee en la leyenda de abajo o haciendo click. */}
+          {mode === "heat" && puntosMarcados.map((p, i) => (
             <CircleMarker
-              center={[puntoCritico.lat, puntoCritico.lng]}
-              radius={9}
-              pathOptions={{ color: "#111", weight: 3, fillColor: "#fff", fillOpacity: 0.95 }}
+              // la key incluye el modo: al alternar entre etiqueta completa y
+              // chapita numerada, react-leaflet reutilizaba el marcador y el
+              // tooltip del #1 quedaba sin volver a vincularse
+              key={`${p.dispositivo}-${mostrarTop ? "top" : "solo"}`}
+              center={[p.lat, p.lng]}
+              radius={mostrarTop ? 11 : 9}
+              pathOptions={{ color: "#111", weight: i === 0 ? 3 : 2, fillColor: "#fff", fillOpacity: 0.95 }}
             >
-              <Tooltip permanent direction="top" offset={[0, -10]} className="tooltip-critico">
-                <b>{puntoCritico.direccion}</b>
-                <br />
-                {puntoCritico.cuenta} incidente{puntoCritico.cuenta === 1 ? "" : "s"}
-              </Tooltip>
+              {mostrarTop ? (
+                <>
+                  <Tooltip permanent direction="center" className="badge-top">{i + 1}</Tooltip>
+                  <Popup>
+                    <b>{i + 1}. {p.direccion}</b><br />
+                    {nfMapa(p.cuenta)} incidente{p.cuenta === 1 ? "" : "s"}<br />
+                    <span style={{ color: "#6b7a8d" }}>{p.dispositivo}</span>
+                  </Popup>
+                </>
+              ) : (
+                <Tooltip permanent direction="top" offset={[0, -10]} className="tooltip-critico">
+                  <b>{p.direccion}</b>
+                  <br />
+                  {nfMapa(p.cuenta)} incidente{p.cuenta === 1 ? "" : "s"}
+                </Tooltip>
+              )}
             </CircleMarker>
-          )}
+          ))}
           {mode === "heat" && points.length > 0 && (
             <HeatLayer
               points={points} 
@@ -455,6 +513,19 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
             ))}
         </MapContainer>
       </div>
+
+      {/* Ranking legible: sobre el mapa solo va el número, acá el detalle. */}
+      {mode === "heat" && mostrarTop && puntosMarcados.length > 0 && (
+        <ol className="top-legend">
+          {puntosMarcados.map((p, i) => (
+            <li key={p.dispositivo}>
+              <span className="top-rank">{i + 1}</span>
+              <span className="top-dir" title={p.direccion}>{p.direccion}</span>
+              <span className="top-num">{nfMapa(p.cuenta)}</span>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }
