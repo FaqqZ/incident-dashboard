@@ -251,6 +251,9 @@ function loadIncidents(filePath, opts = {}) {
 
   return {
     records,
+    // Se devuelve el mapa de cámaras para que el Excel de siniestralidad pueda
+    // cruzar coordenadas por Dispositivo sin volver a parsear este archivo.
+    cameras,
     meta: {
       hojaIncidentes: bdSheet,
       hojaCamaras: camSheet,
@@ -378,6 +381,135 @@ function buildMapPoints(records) {
   return Array.from(acc.values());
 }
 
+// ---------------------------------------------------------------------------
+// RECURRENCIA TERRITORIAL DE SINIESTROS VIALES (COMM)
+// ---------------------------------------------------------------------------
+// Fuente: hoja "Hoja2" de "COM indicadores de siniestralidad...". Una fila por
+// dispositivo donde se detectó al menos un siniestro vial en el período.
+//
+// IMPORTANTE: la clasificación (percentiles P75/P90/P95, clase, color y
+// prioridad piloto) viene YA CALCULADA desde Excel y NO se recalcula acá, por
+// pedido expreso de las instrucciones del COMM. Este módulo solo lee, valida y
+// cruza contra las coordenadas de la base de cámaras por el código Dispositivo.
+const CLASES_RECURRENCIA = ["MUY ALTA", "ALTA", "RELEVANTE", "BAJA"];
+const COLORES_RECURRENCIA = ["ROJO", "NARANJA", "AMARILLO", "SIN SEÑAL"];
+const PRIORIDADES = ["PRIORIDAD 1", "PRIORIDAD 2", "SIN PRIORIDAD"];
+
+function loadRecurrencia(filePath, cameras) {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`No se encontró el Excel de siniestralidad en: ${filePath}`);
+  }
+  const wb = XLSX.readFile(filePath);
+  const hoja =
+    findSheetName(wb, { exact: ["Hoja2"], contains: ["hoja2", "siniestr", "recurrenc"] }) ||
+    wb.SheetNames[0];
+
+  const rawRows = XLSX.utils.sheet_to_json(wb.Sheets[hoja], { defval: "" });
+  const headers = rawRows.length ? Object.keys(rawRows[0]) : [];
+
+  const colDisp = pickColumn(headers, ["dispositivo"]);
+  const colUbic = pickColumn(headers, ["ubicacion", "ubicación"]);
+  const colAcum = pickColumn(headers, ["sv acumulados", "acumulados"]);
+  const colProm = pickColumn(headers, ["sv promedio mensual", "promedio mensual", "promedio"]);
+  const colMeses = pickColumn(headers, ["meses con sv", "meses"]);
+  const colPers = pickColumn(headers, ["persistencia %", "persistencia"]);
+  const colClase = pickColumn(headers, ["clase de recurrencia", "clase"]);
+  const colColor = pickColumn(headers, ["color"]);
+  const colPrio = pickColumn(headers, ["prioridad piloto", "prioridad"]);
+
+  const puntos = [];
+  let sinCoordenadas = 0;
+  let filasVacias = 0;
+
+  for (const row of rawRows) {
+    const dispositivo = clean(row[colDisp]);
+    if (!dispositivo) { filasVacias++; continue; }
+
+    // Los ids de la hoja de cámaras vienen en mayúsculas, pero se prueban las
+    // dos formas para no depender de eso.
+    const idBase = fixId(dispositivo);
+    const id = idBase.toUpperCase();
+    const cam = cameras.byId.get(idBase) || cameras.byId.get(id) || null;
+    if (!cam) sinCoordenadas++;
+
+    // Persistencia viene como fracción (0,857). Se guarda 0-100 para el front.
+    const persistenciaRaw = toFloat(row[colPers]);
+    const persistencia =
+      persistenciaRaw === null ? null : persistenciaRaw <= 1 ? persistenciaRaw * 100 : persistenciaRaw;
+
+    puntos.push({
+      dispositivo: id,
+      ubicacion: clean(row[colUbic]) || (cam ? cam.direccion : "Sin ubicación"),
+      svAcumulados: toFloat(row[colAcum]) ?? 0,
+      svPromedioMensual: toFloat(row[colProm]) ?? 0,
+      mesesConSV: toFloat(row[colMeses]) ?? 0,
+      persistencia,
+      clase: clean(row[colClase]) || "SIN CLASE",
+      color: clean(row[colColor]) || "SIN SEÑAL",
+      prioridad: clean(row[colPrio]) || "SIN PRIORIDAD",
+      lat: cam ? cam.lat : null,
+      lng: cam ? cam.lng : null,
+    });
+  }
+
+  return {
+    puntos,
+    meta: {
+      hoja,
+      totalFilas: rawRows.length,
+      puntosReales: puntos.length,
+      filasVacias,
+      sinCoordenadas,
+      svTotales: puntos.reduce((s, p) => s + p.svAcumulados, 0),
+      columnas: {
+        dispositivo: colDisp, ubicacion: colUbic, svAcumulados: colAcum,
+        svPromedioMensual: colProm, mesesConSV: colMeses, persistencia: colPers,
+        clase: colClase, color: colColor, prioridad: colPrio,
+      },
+    },
+  };
+}
+
+// Orden fijo (de mayor a menor recurrencia), no alfabético: en los selectores
+// tiene que leerse como una escala, no como una lista.
+function ordenarPor(valores, orden) {
+  const presentes = new Set(valores);
+  const conocidos = orden.filter((v) => presentes.has(v));
+  const resto = [...presentes].filter((v) => !orden.includes(v)).sort();
+  return [...conocidos, ...resto];
+}
+
+function opcionesRecurrencia(puntos) {
+  return {
+    clases: ordenarPor(puntos.map((p) => p.clase), CLASES_RECURRENCIA),
+    colores: ordenarPor(puntos.map((p) => p.color), COLORES_RECURRENCIA),
+    prioridades: ordenarPor(puntos.map((p) => p.prioridad), PRIORIDADES),
+  };
+}
+
+function filtrarRecurrencia(puntos, { clase, color, prioridad } = {}) {
+  return puntos.filter((p) => {
+    if (clase && p.clase !== clase) return false;
+    if (color && p.color !== color) return false;
+    if (prioridad && p.prioridad !== prioridad) return false;
+    return true;
+  });
+}
+
+function resumenRecurrencia(puntos) {
+  const cuenta = (campo, valor) => puntos.filter((p) => p[campo] === valor).length;
+  const conPrioridad = puntos.filter((p) => p.prioridad !== "SIN PRIORIDAD");
+  return {
+    puntos: puntos.length,
+    svTotales: puntos.reduce((s, p) => s + p.svAcumulados, 0),
+    porColor: COLORES_RECURRENCIA.map((c) => ({ name: c, value: cuenta("color", c) })),
+    porClase: CLASES_RECURRENCIA.map((c) => ({ name: c, value: cuenta("clase", c) })),
+    prioridad1: cuenta("prioridad", "PRIORIDAD 1"),
+    prioridad2: cuenta("prioridad", "PRIORIDAD 2"),
+    priorizados: conPrioridad.length,
+  };
+}
+
 function buildKpis(records) {
   return {
     total: total(records),
@@ -418,4 +550,8 @@ module.exports = {
   buildKpis,
   buildFilterOptions,
   buildMapPoints,
+  loadRecurrencia,
+  opcionesRecurrencia,
+  filtrarRecurrencia,
+  resumenRecurrencia,
 };

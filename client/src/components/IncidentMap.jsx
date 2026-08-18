@@ -267,23 +267,51 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
   // Pantalla completa REAL (Fullscreen API): usa todo el monitor y esconde la
   // barra del navegador. Si el navegador la rechaza se cae al overlay CSS, que
   // igual ocupa toda la ventana.
+  const enFullscreenNativo = () =>
+    Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+
   const alternarPantallaCompleta = () => {
     const el = contenedorRef.current;
-    if (!document.fullscreenElement) {
-      el?.requestFullscreen?.().catch(() => setPantallaCompleta(true));
-      setPantallaCompleta(true);
-    } else {
-      document.exitFullscreen?.().catch(() => {});
+
+    if (enFullscreenNativo()) {
+      const salir = document.exitFullscreen || document.webkitExitFullscreen;
+      try { salir?.call(document); } catch { /* el estado local igual se apaga */ }
       setPantallaCompleta(false);
+      return;
+    }
+
+    // El overlay CSS se aplica SIEMPRE y primero: es el que garantiza que el
+    // botón haga algo. La Fullscreen API es una mejora encima, no un requisito.
+    setPantallaCompleta(true);
+
+    // OJO: nada de `el?.requestFullscreen?.().catch(...)`. Si el método no
+    // existe (iOS Safari no soporta Fullscreen API fuera de <video>), la
+    // expresión da undefined y el .catch encadenado tira TypeError, matando el
+    // handler antes del fallback: el botón quedaba sin hacer nada.
+    const pedir = el?.requestFullscreen || el?.webkitRequestFullscreen;
+    if (typeof pedir !== "function") return;
+    try {
+      const r = pedir.call(el);
+      if (r && typeof r.catch === "function") r.catch(() => {});
+    } catch {
+      /* se queda con el overlay, que ya está puesto */
     }
   };
 
   // El usuario puede salir con F11 o Esc sin pasar por el botón: hay que
   // escuchar al navegador para no quedar con el estado desincronizado.
   useEffect(() => {
-    const onFsChange = () => setPantallaCompleta(Boolean(document.fullscreenElement));
+    // Solo apaga el overlay si veníamos de fullscreen nativo: cuando la API no
+    // está disponible nunca se dispara y el overlay tiene que seguir en pie.
+    const onFsChange = () => {
+      if (!enFullscreenNativo()) setPantallaCompleta(false);
+    };
     document.addEventListener("fullscreenchange", onFsChange);
-    return () => document.removeEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -592,6 +620,24 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
           {/* Con el top N las direcciones se encimaban (los focos están todos en
               el centro), así que sobre el mapa va solo el número y el detalle
               se lee en la leyenda de abajo o haciendo click. */}
+          {/* Zonas de hover invisibles sobre el mapa de calor: leaflet.heat
+              pinta un canvas sin objetos, así que no hay nada que "tocar".
+              Estos círculos transparentes dan el mismo tooltip que las burbujas. */}
+          {mode === "heat" && puntosOrdenados.map((p) => (
+            <CircleMarker
+              key={`hit-${p.dispositivo}`}
+              center={[p.lat, p.lng]}
+              radius={10}
+              pathOptions={{ stroke: false, fill: true, fillOpacity: 0, className: "hit-calor" }}
+            >
+              <Tooltip direction="top" offset={[0, -6]} className="tooltip-critico" sticky>
+                <b>{p.direccion}</b>
+                <br />
+                {nfMapa(p.cuenta)} incidente{p.cuenta === 1 ? "" : "s"}
+              </Tooltip>
+            </CircleMarker>
+          ))}
+
           {mode === "heat" && puntosMarcados.map((p, i) => (
             <CircleMarker
               // la key incluye el modo: al alternar entre etiqueta completa y

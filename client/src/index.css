@@ -467,6 +467,90 @@
   border-top-color: rgba(255, 255, 255, 0.96);
 }
 
+/* --- Mapa de recurrencia territorial de siniestros viales (COMM) --- */
+.recurrencia-filtros {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  box-shadow: none;
+  background: var(--surface-2);
+}
+
+.recurrencia-resumen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  font-size: 13px;
+  color: var(--ink-2);
+  margin-bottom: 14px;
+}
+
+.recurrencia-resumen b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.recurrencia-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.leyenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.leyenda-punto {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
+}
+
+/* Los anillos replican el marcador de prioridad piloto del mapa: contorno
+   extra que NO altera el color de la clase de recurrencia (§7). */
+.leyenda-anillo {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.leyenda-anillo-1 {
+  border: 2px solid var(--ink);
+}
+
+.leyenda-anillo-2 {
+  border: 2px dashed var(--ink);
+}
+
+/* El mapa de recurrencia usa tiles claros, así que el tooltip va en claro. */
+.tooltip-recurrencia {
+  font-family: var(--font);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.tooltip-recurrencia hr {
+  border: none;
+  border-top: 1px solid #d8dee6;
+  margin: 5px 0;
+}
+
+/* Zona de hover del mapa de calor: invisible pero clickeable/hovereable.
+   Con fill-opacity 0 el hit-testing por defecto de SVG la ignoraría. */
+.hit-calor {
+  pointer-events: all;
+  cursor: pointer;
+}
+
 /* Chapita con el número de ranking, centrada dentro del marcador */
 .leaflet-tooltip.badge-top {
   background: transparent;

@@ -23,6 +23,22 @@ export async function fetchOptions() {
   return res.json();
 }
 
+// --- Recurrencia territorial de siniestros viales (COMM) ---
+export async function fetchRecurrencia(filtros) {
+  const res = await fetch(`/api/recurrencia${qs(filtros)}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Error ${res.status} al cargar la recurrencia`);
+  }
+  return res.json();
+}
+
+export async function fetchRecurrenciaOptions() {
+  const res = await fetch("/api/recurrencia/options");
+  if (!res.ok) throw new Error("No se pudieron cargar los filtros de recurrencia");
+  return res.json();
+}
+
 export async function fetchHealth() {
   const res = await fetch("/api/health");
   return res.json();

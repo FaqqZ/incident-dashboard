@@ -37,17 +37,45 @@ app.use(express.json());
 
 let state = { records: [], meta: {}, loadedAt: null, error: null };
 
+// Recurrencia territorial de siniestros viales (COMM): archivo aparte, con la
+// clasificación ya calculada en Excel. Si falta, el resto del tablero sigue
+// funcionando y solo esa vista avisa del problema.
+const SINIESTRALIDAD_PATH =
+  process.env.SINIESTRALIDAD_PATH || path.join(DATA_DIR, "siniestralidad.xlsx");
+
+let recurrencia = { puntos: [], meta: {}, loadedAt: null, error: null };
+
 function reload() {
+  let cameras = null;
   try {
-    const { records, meta } = R.loadIncidents(EXCEL_PATH);
-    state = { records, meta, loadedAt: new Date().toISOString(), error: null };
+    const cargado = R.loadIncidents(EXCEL_PATH);
+    cameras = cargado.cameras;
+    state = {
+      records: cargado.records,
+      meta: cargado.meta,
+      loadedAt: new Date().toISOString(),
+      error: null,
+    };
     console.log(
-      `[data] ${records.length} incidentes | hoja "${meta.hojaIncidentes}" + ` +
-        `"${meta.hojaCamaras}" | ${meta.incidentesSinCamara} sin cámara`
+      `[data] ${cargado.records.length} incidentes | hoja "${cargado.meta.hojaIncidentes}" + ` +
+        `"${cargado.meta.hojaCamaras}" | ${cargado.meta.incidentesSinCamara} sin cámara`
     );
   } catch (err) {
     state = { records: [], meta: {}, loadedAt: null, error: err.message };
     console.error("[data] Error al cargar el Excel:", err.message);
+  }
+
+  try {
+    if (!cameras) throw new Error("Sin base de cámaras: no se pueden ubicar los puntos");
+    const { puntos, meta } = R.loadRecurrencia(SINIESTRALIDAD_PATH, cameras);
+    recurrencia = { puntos, meta, loadedAt: new Date().toISOString(), error: null };
+    console.log(
+      `[recurrencia] ${puntos.length} puntos | hoja "${meta.hoja}" | ` +
+        `${meta.svTotales} siniestros | ${meta.sinCoordenadas} sin coordenadas`
+    );
+  } catch (err) {
+    recurrencia = { puntos: [], meta: {}, loadedAt: null, error: err.message };
+    console.error("[recurrencia] Error al cargar el Excel:", err.message);
   }
 }
 reload();
@@ -101,6 +129,33 @@ app.get("/api/dashboard", (req, res) => {
     puntos: R.buildMapPoints(f),
     totalFiltrado: f.length,
   });
+});
+
+// --- Recurrencia territorial de siniestros viales (COMM) ---
+// La clasificación viene calculada desde Excel: acá NO se recalculan
+// percentiles ni clases, solo se filtra y se sirve.
+app.get("/api/recurrencia", (req, res) => {
+  if (recurrencia.error) return res.status(500).json({ error: recurrencia.error });
+  const filtros = {
+    clase: req.query.clase || null,
+    color: req.query.color || null,
+    prioridad: req.query.prioridad || null,
+  };
+  const filtrados = R.filtrarRecurrencia(recurrencia.puntos, filtros);
+  res.json({
+    filtros,
+    puntos: filtrados,
+    resumen: R.resumenRecurrencia(filtrados),
+    totalSinFiltrar: recurrencia.puntos.length,
+    periodo: "Acumulado enero–julio de 2026",
+    meta: recurrencia.meta,
+    loadedAt: recurrencia.loadedAt,
+  });
+});
+
+app.get("/api/recurrencia/options", (req, res) => {
+  if (recurrencia.error) return res.status(500).json({ error: recurrencia.error });
+  res.json(R.opcionesRecurrencia(recurrencia.puntos));
 });
 
 // --- Carga de un nuevo Excel (actualización mensual) ---

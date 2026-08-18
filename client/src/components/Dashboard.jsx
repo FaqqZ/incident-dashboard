@@ -12,6 +12,7 @@ import CategoryBarChart from "./CategoryBarChart";
 import RankingChart from "./RankingChart";
 import TrendLineChart from "./TrendLineChart";
 import IncidentMap from "./IncidentMap";
+import RecurrenciaPanel from "./RecurrenciaPanel";
 import ExportButton from "./ExportButton";
 
 const nf = (n) => (n ?? 0).toLocaleString("es-AR");
@@ -98,6 +99,11 @@ export default function Dashboard() {
                   <IncidentMap points={data.puntos} categoriaPrincipal={data.categoriaPrincipal} />
                 </div>
               </section>
+
+              {/* --- Recurrencia territorial de siniestros viales (COMM) ---
+                  Fuente propia (siniestralidad.xlsx) y filtros propios: no
+                  depende de los filtros generales del tablero. */}
+              <RecurrenciaPanel />
 
               {/* --- Gráficos estadísticos --- */}
               {/* Los de barras horizontales (categoría, puntos críticos) van a
