@@ -12,7 +12,6 @@ import CategoryBarChart from "./CategoryBarChart";
 import RankingChart from "./RankingChart";
 import TrendLineChart from "./TrendLineChart";
 import IncidentMap from "./IncidentMap";
-import RecurrenciaPanel from "./RecurrenciaPanel";
 import ExportButton from "./ExportButton";
 
 const nf = (n) => (n ?? 0).toLocaleString("es-AR");
@@ -60,6 +59,9 @@ export default function Dashboard() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {data && <span className="updated">{nf(data.totalFiltrado)} incidentes en vista</span>}
+          <Link to="/siniestros-viales" className="btn" style={{ fontSize: "12px" }}>
+            Siniestros viales
+          </Link>
           <Link to="/datos" className="btn" style={{ fontSize: "12px" }}>Gestión de datos</Link>
           <ExportButton />
         </div>
@@ -102,11 +104,6 @@ export default function Dashboard() {
                     mesesObservados={data.porMes?.length || 1} />
                 </div>
               </section>
-
-              {/* --- Recurrencia territorial de siniestros viales (COMM) ---
-                  Fuente propia (siniestralidad.xlsx) y filtros propios: no
-                  depende de los filtros generales del tablero. */}
-              <RecurrenciaPanel />
 
               {/* --- Gráficos estadísticos --- */}
               {/* Los de barras horizontales (categoría, puntos críticos) van a

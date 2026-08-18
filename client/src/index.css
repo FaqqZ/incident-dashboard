@@ -1193,3 +1193,9 @@
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
+
+/* En su vista dedicada el mapa de recurrencia es el único contenido, así que
+   gana alto. En pantalla completa manda .map-fs, que va después. */
+.vista-siniestros .map-shell {
+  height: 620px;
+}
