@@ -96,7 +96,10 @@ export default function Dashboard() {
                 <div className="panel panel-full-width">
                   <h3>Mapa de incidentes</h3>
                   <p className="panel-sub">Concentración por cámara · tamaño = cantidad</p>
-                  <IncidentMap points={data.puntos} categoriaPrincipal={data.categoriaPrincipal} />
+                  {/* mesesObservados alimenta el indicador del COMM
+                      (promedio mensual = acumulado / meses observados). */}
+                  <IncidentMap points={data.puntos} categoriaPrincipal={data.categoriaPrincipal}
+                    mesesObservados={data.porMes?.length || 1} />
                 </div>
               </section>
 

@@ -6,6 +6,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet.heat";
+// Misma paleta que el mapa de recurrencia: un punto rojo tiene que significar
+// lo mismo en los dos mapas.
+import { COLOR_HEX } from "./RecurrenciaMap";
 
 const CENTRO = [-26.8241, -65.2226]; // San Miguel de Tucumán
 const ZOOM = 13;
@@ -24,16 +27,22 @@ const TOP_N = 10;
 
 const nfMapa = (n) => (n ?? 0).toLocaleString("es-AR");
 
-// Colores del gradiente, de menor a mayor concentración. Calibrados para el
-// mapa CLARO: el resto del tablero es oscuro, pero el mapa no.
-const COLORES = ["#2f6f8f", "#4c9f70", "#e0a458", "#ed7d31", "#d1495b"];
+// Clasificación según la metodología del COMM (instructivo de siniestros
+// viales, §4): percentiles P75 / P90 / P95 del indicador "promedio mensual".
+// Se reusa la MISMA paleta que el mapa de recurrencia para que un punto rojo
+// signifique lo mismo en los dos mapas.
+const CUANTILES = [0.75, 0.9, 0.95];
 
-const ETIQUETAS_BANDA = ["Bajo", "Moderado", "Elevado", "Alto", "Crítico"];
+const CLASES = [
+  { nombre: "Sin señal", color: COLOR_HEX["SIN SEÑAL"], detalle: "< P75" },
+  { nombre: "Relevante", color: COLOR_HEX.AMARILLO, detalle: "P75–P90" },
+  { nombre: "Alta", color: COLOR_HEX.NARANJA, detalle: "P90–P95" },
+  { nombre: "Muy alta", color: COLOR_HEX.ROJO, detalle: "≥ P95" },
+];
 
-// Los umbrales NO son números elegidos a dedo: son cuantiles de la distribución
-// real de incidentes por cámara. Así "crítico" significa algo concreto —el 2%
-// de las cámaras con más carga— en vez de un 0,8 arbitrario que no dice nada.
-const CUANTILES = [0.5, 0.8, 0.92, 0.98];
+// Cortes del gradiente: fijos, uno por clase. Al ser constantes, un color del
+// mapa siempre corresponde a la misma clase, sin importar el filtro puesto.
+const CORTES_PESO = [0.25, 0.5, 0.75, 1];
 
 // Cómo se traduce la cantidad de incidentes a "peso" del punto.
 // Antes había un techo FIJO (35) y rompía el mapa en las dos direcciones:
@@ -50,15 +59,37 @@ function cuentaDe(p, category) {
   return category && category !== "all" ? (p.porCategoria?.[category] || 0) : p.count;
 }
 
-// Peso de un punto: log normalizado al máximo del conjunto filtrado.
-function pesoDe(count, maxCount) {
-  return WEIGHT_MIN + (1 - WEIGHT_MIN) * (Math.log1p(count) / (Math.log1p(maxCount) || 1));
+// PERCENTILE.INC de Excel: interpolación lineal sobre rank = q*(n-1). Hay que
+// usar exactamente este método, no un índice redondeado, para reproducir al
+// dígito la clasificación que el COMM ya calculó en su planilla.
+function percentilInc(ordenados, q) {
+  const i = q * (ordenados.length - 1);
+  const lo = Math.floor(i);
+  const hi = Math.ceil(i);
+  return lo === hi ? ordenados[lo] : ordenados[lo] + (ordenados[hi] - ordenados[lo]) * (i - lo);
 }
 
-// Deriva los umbrales del gradiente y las bandas de la leyenda a partir de la
-// distribución real. Devuelve también los cortes en incidentes, que es lo que
-// permite decir "de tal número para arriba es crítico".
-function escalaDesdeDatos(points, category) {
+// Peso de un punto: se lo ubica en su banda de clase y se interpola DENTRO de
+// esa banda. Así el color nunca miente: si el punto está en la franja roja del
+// gradiente es porque su clase es "Muy alta", no porque haya mucho acumulado.
+function pesoDe(count, cortes, maxCount) {
+  const [p75, p90, p95] = cortes;
+  const bandas = [
+    { lo: 0, hi: p75, wLo: WEIGHT_MIN, wHi: CORTES_PESO[0] },
+    { lo: p75, hi: p90, wLo: CORTES_PESO[0], wHi: CORTES_PESO[1] },
+    { lo: p90, hi: p95, wLo: CORTES_PESO[1], wHi: CORTES_PESO[2] },
+    { lo: p95, hi: Math.max(maxCount, p95), wLo: CORTES_PESO[2], wHi: CORTES_PESO[3] },
+  ];
+  const b = count >= p95 ? bandas[3] : count >= p90 ? bandas[2] : count >= p75 ? bandas[1] : bandas[0];
+  const ancho = b.hi - b.lo;
+  const t = ancho > 0 ? Math.min(1, Math.max(0, (count - b.lo) / ancho)) : 1;
+  return b.wLo + (b.wHi - b.wLo) * t;
+}
+
+// Clasifica los puntos visibles con la metodología del COMM y arma la leyenda.
+// Los cortes se calculan sobre el conjunto FILTRADO: con "Siniestros viales"
+// puesto reproduce exactamente las clases de la planilla del COMM.
+function escalaDesdeDatos(points, category, mesesObservados) {
   const counts = points
     .map((p) => cuentaDe(p, category))
     .filter((c) => c > 0)
@@ -66,43 +97,31 @@ function escalaDesdeDatos(points, category) {
   if (!counts.length) return null;
 
   const maxCount = counts[counts.length - 1];
-  const cuantil = (q) => counts[Math.min(counts.length - 1, Math.round(q * (counts.length - 1)))];
-  const cortes = CUANTILES.map(cuantil);
+  const cortes = CUANTILES.map((q) => percentilInc(counts, q));
 
-  // Umbrales estrictamente crecientes: con muchos conteos repetidos (por
-  // ejemplo un montón de cámaras con 1 incidente) dos cuantiles pueden caer en
-  // el mismo valor y el gradiente de leaflet.heat se rompe.
-  let previo = 0;
-  const gradient = cortes.map((c, i) => {
-    const t = Math.min(0.98, Math.max(previo + 0.04, +pesoDe(c, maxCount).toFixed(2)));
-    previo = t;
-    return { threshold: t, color: COLORES[i] };
-  });
-  gradient.push({ threshold: 1, color: COLORES[4] });
+  const gradient = CLASES.map((c, i) => ({ threshold: CORTES_PESO[i], color: c.color }));
 
-  // Bandas para la leyenda, en incidentes. Se descartan las que quedan vacías
-  // cuando varios cuantiles coinciden (pasa con categorías chicas, donde
-  // medio padrón de cámaras tiene 1 solo incidente).
-  const rangos = [];
-  let desde = 1;
-  cortes.forEach((corte) => {
-    if (corte >= desde) {
-      rangos.push({ desde, hasta: corte });
-      desde = corte + 1;
-    }
-  });
-  if (maxCount >= desde) rangos.push({ desde, hasta: maxCount });
+  // Bandas de la leyenda, expresadas en incidentes enteros. Se descartan las
+  // que quedan vacías cuando dos percentiles caen en el mismo valor (pasa en
+  // categorías chicas, donde media flota de cámaras tiene un solo incidente).
+  const limites = [1, ...cortes.map((c) => Math.ceil(c)), maxCount + 1];
+  const bandas = CLASES.map((c, i) => ({
+    ...c,
+    desde: limites[i],
+    hasta: limites[i + 1] - 1,
+  })).filter((b) => b.hasta >= b.desde);
 
-  // Colores y etiquetas se asignan desde el final: la banda más alta siempre
-  // tiene que leerse como "Crítico", aunque se hayan colapsado bandas.
-  const off = COLORES.length - rangos.length;
-  const bandas = rangos.map((r, i) => ({
-    ...r,
-    color: COLORES[off + i],
-    etiqueta: ETIQUETAS_BANDA[off + i],
-  }));
-
-  return { gradient, bandas, maxCount, camaras: counts.length };
+  const meses = mesesObservados || 1;
+  return {
+    gradient,
+    bandas,
+    cortes,
+    maxCount,
+    camaras: counts.length,
+    meses,
+    // El indicador del COMM: promedio mensual, no acumulado.
+    cortesPromedio: cortes.map((c) => c / meses),
+  };
 }
 
 // leaflet.heat dibuja sobre un canvas del tamaño del mapa y llama a getImageData.
@@ -135,44 +154,48 @@ function useMapHasSize() {
   return hasSize;
 }
 
-function HeatLayer({ points, blur, radius, intensity, category, gradient }) {
+function HeatLayer({ points, blur, radius, intensity, category, gradient, cortes }) {
   const map = useMap();
   const layerRef = useRef(null);
   const hasSize = useMapHasSize();
   useEffect(() => {
-    if (!hasSize) return;
-    // Convertir intensidad (0-100) a max de leaflet.heat (invertido: más intenso = max más bajo)
-    const max = 1.0 - (intensity / 100) * 0.75;
-    
+    if (!hasSize || !cortes) return;
+    // max FIJO en 1: los pesos ya vienen normalizados por clase, así que el
+    // color de un punto se corresponde con su clase. Si `max` se moviera con el
+    // slider, el mismo punto cambiaría de color sin que cambien los datos y la
+    // leyenda pasaría a mentir.
+    const max = 1.0;
+
     // Construir objeto gradient desde el array
     const gradientObj = {};
     gradient.forEach((g) => {
       gradientObj[g.threshold] = g.color;
     });
-    
-    // Techo adaptativo: el punto más cargado del conjunto FILTRADO siempre
-    // llega al tope del gradiente, con o sin categoría puesta.
+
     const maxCount = points.reduce((m, p) => Math.max(m, cuentaDe(p, category)), 0);
 
     const heatData = points
       .map((p) => {
         const count = cuentaDe(p, category);
         if (count === 0) return null; // Excluir puntos sin incidentes de esta categoría
-        return [p.lat, p.lng, pesoDe(count, maxCount)];
+        return [p.lat, p.lng, pesoDe(count, cortes, maxCount)];
       })
       .filter(Boolean); // Remover nulls
     
     if (layerRef.current) map.removeLayer(layerRef.current);
     layerRef.current = L.heatLayer(heatData, {
       max,
-      minOpacity: HEAT_MIN_OPACITY,
+      // El slider de intensidad ahora regula la opacidad mínima, no el `max`:
+      // sirve para que los focos tenues se vean más o menos, sin alterar a qué
+      // clase corresponde cada color.
+      minOpacity: HEAT_MIN_OPACITY + (intensity / 100) * 0.35,
       radius,
       blur,
       maxZoom: 17,
       gradient: gradientObj,
     }).addTo(map);
     return () => { if (layerRef.current) map.removeLayer(layerRef.current); };
-  }, [map, hasSize, points, blur, radius, intensity, category, gradient]);
+  }, [map, hasSize, points, blur, radius, intensity, category, gradient, cortes]);
   return null;
 }
 
@@ -238,7 +261,7 @@ function thresholdToPercent(threshold) {
   return Math.round(threshold * 100) + "%";
 }
 
-export default function IncidentMap({ points, categoriaPrincipal }) {
+export default function IncidentMap({ points, categoriaPrincipal, mesesObservados = 1 }) {
   const [mode, setMode] = useState("heat");
   const [blur, setBlur] = useState(DEFAULT_BLUR);
   const [radius, setRadius] = useState(DEFAULT_RADIUS);
@@ -345,8 +368,8 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
   // Escala derivada de los datos visibles: umbrales del gradiente + bandas de
   // la leyenda, en incidentes.
   const escala = useMemo(
-    () => escalaDesdeDatos(points, currentCategory),
-    [points, currentCategory]
+    () => escalaDesdeDatos(points, currentCategory, mesesObservados),
+    [points, currentCategory, mesesObservados]
   );
 
   // Mientras el usuario no toque los umbrales a mano, siguen a los datos.
@@ -594,15 +617,19 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
       {mode === "heat" && escala && escala.bandas.length > 0 && (
         <div className="heat-legend">
           <span className="heat-legend-title">
-            Incidentes por cámara{umbralesManuales ? " · umbrales manuales" : ""}
+            Recurrencia por cámara · percentiles P75/P90/P95 sobre {escala.camaras} cámaras
+            {escala.meses > 1 ? ` en ${escala.meses} meses` : ""}
+            {umbralesManuales ? " · umbrales manuales" : ""}
           </span>
           <div className="heat-legend-bands">
             {escala.bandas.map((b) => (
-              <span className="heat-band" key={b.etiqueta}>
+              <span className="heat-band" key={b.nombre}>
                 <span className="heat-band-dot" style={{ background: b.color }} />
-                <b>{b.etiqueta}</b>
+                <b>{b.nombre}</b>
+                <span className="heat-band-detalle">{b.detalle}</span>
                 <span className="heat-band-rango">
                   {b.desde === b.hasta ? nfMapa(b.desde) : `${nfMapa(b.desde)}–${nfMapa(b.hasta)}`}
+                  {" incid."}
                 </span>
               </span>
             ))}
@@ -674,6 +701,7 @@ export default function IncidentMap({ points, categoriaPrincipal }) {
               intensity={intensity} 
               category={currentCategory}
               gradient={gradient}
+              cortes={escala?.cortes}
             />
           )}
           {mode === "bubbles" &&

@@ -1186,3 +1186,10 @@
     animation: none;
   }
 }
+
+/* Detalle del percentil dentro de cada banda de la leyenda del mapa de calor */
+.heat-band-detalle {
+  font-size: 11px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
