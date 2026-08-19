@@ -16,7 +16,7 @@ import {
   CartesianGrid, Cell, LabelList,
 } from "recharts";
 import { fetchAnalisisCategoria, fetchOptions } from "../api";
-import RecurrenciaMap, { COLOR_HEX, ETIQUETAS_GENERICAS } from "./RecurrenciaMap";
+import RecurrenciaMap, { COLOR_HEX, COLOR_MAXIMO, ETIQUETAS_GENERICAS } from "./RecurrenciaMap";
 import KpiCard from "./KpiCard";
 import { SERIE, MAXIMO, TOOLTIP, indiceMaximo, colorSegunMaximo, dotMaximo } from "../chartTheme";
 
@@ -49,6 +49,9 @@ export default function AnalisisCategoria() {
   const priorizados = (data?.puntos || [])
     .filter((p) => p.prioridad !== "SIN PRIORIDAD")
     .sort((a, b) => b.svAcumulados - a.svAcumulados);
+  // Vienen ordenados desc, pero si hay empate en el tope no se resalta ninguno.
+  const maxSV = priorizados[0]?.svAcumulados;
+  const hayUnicoMaximo = priorizados.filter((p) => p.svAcumulados === maxSV).length === 1;
 
   return (
     <div className="app">
@@ -207,11 +210,21 @@ export default function AnalisisCategoria() {
                         [`${v} incidentes · persistencia ${nf(p.payload.persistencia, 1)}% · ${p.payload.prioridad}`,
                           p.payload.dispositivo]} />
                     <Bar dataKey="svAcumulados" radius={[0, 6, 6, 0]} maxBarSize={22} isAnimationActive={false}>
-                      {priorizados.map((p) => (
-                        <Cell key={p.dispositivo} fill={COLOR_HEX[p.color] || COLOR_HEX["SIN SEÑAL"]} />
+                      {priorizados.map((p, i) => (
+                        <Cell key={p.dispositivo}
+                          fill={COLOR_HEX[p.color] || COLOR_HEX["SIN SEÑAL"]}
+                          stroke={hayUnicoMaximo && i === 0 ? COLOR_MAXIMO : undefined}
+                          strokeWidth={hayUnicoMaximo && i === 0 ? 2.5 : 0} />
                       ))}
                       <LabelList dataKey="svAcumulados" position="right" offset={8}
-                        style={{ fill: "var(--ink)", fontSize: 11, fontWeight: 600 }} />
+                        content={({ x, y, width, height, value, index }) => (
+                          <text x={x + width + 8} y={y + height / 2} dy={4}
+                            fill={hayUnicoMaximo && index === 0 ? COLOR_MAXIMO : "var(--ink)"}
+                            fontSize={hayUnicoMaximo && index === 0 ? 13 : 11}
+                            fontWeight={hayUnicoMaximo && index === 0 ? 700 : 600}>
+                            {(value ?? 0).toLocaleString("es-AR")}
+                          </text>
+                        )} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>

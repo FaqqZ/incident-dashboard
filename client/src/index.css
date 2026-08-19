@@ -1199,3 +1199,9 @@
 .vista-siniestros .map-shell {
   height: 620px;
 }
+
+/* Anillo del dispositivo con más incidentes. No reemplaza el color de clase
+   del instructivo (§5): lo rodea, como habilita el §7. */
+.leyenda-anillo-max {
+  border: 2px solid var(--color-1);
+}

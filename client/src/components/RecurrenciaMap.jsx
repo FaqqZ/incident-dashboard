@@ -16,6 +16,10 @@ const CENTRO = [-26.8241, -65.2226];
 const ZOOM = 13;
 
 // §5 — correspondencia de colores. SIN SEÑAL en gris claro.
+// Amarillo institucional (--color-1). Va literal y no como var(): Leaflet
+// escribe estos valores como atributos de presentación del SVG del mapa.
+export const COLOR_MAXIMO = "#f4dc00";
+
 export const COLOR_HEX = {
   ROJO: "#d62828",
   NARANJA: "#f77f00",
@@ -149,6 +153,14 @@ export default function RecurrenciaMap({ puntos, etiquetas }) {
     return peso(a) - peso(b);
   });
 
+  // El dispositivo con más incidentes se señala con un anillo amarillo. El
+  // color de relleno NO se toca: sigue siendo el de su clase, como exige el §5.
+  // El §7 avala justamente esto: un marcador adicional en vez de otro color.
+  const maximo = ubicables.reduce(
+    (mejor, p) => (!mejor || p.svAcumulados > mejor.svAcumulados ? p : mejor),
+    null
+  );
+
   return (
     <div ref={contenedorRef} className={pantallaCompleta ? "map-wrap map-fs" : "map-wrap"}>
       <div className="map-bar">
@@ -170,6 +182,10 @@ export default function RecurrenciaMap({ puntos, etiquetas }) {
             <i className="leyenda-anillo leyenda-anillo-2" />
             Prioridad 2
           </span>
+          <span className="leyenda-item">
+            <i className="leyenda-anillo leyenda-anillo-max" />
+            Máximo
+          </span>
         </div>
 
         <button className="btn" onClick={alternarPantallaCompleta} aria-pressed={pantallaCompleta}>
@@ -189,8 +205,17 @@ export default function RecurrenciaMap({ puntos, etiquetas }) {
           {ordenados.map((p) => {
             const estilo = estiloPunto(p);
             const priorizado = p.prioridad && p.prioridad !== "SIN PRIORIDAD";
+            const esMaximo = maximo && p.dispositivo === maximo.dispositivo;
             return (
               <Fragment key={p.dispositivo}>
+                {esMaximo && (
+                  <CircleMarker
+                    center={[p.lat, p.lng]}
+                    radius={estilo.radius + 10}
+                    interactive={false}
+                    pathOptions={{ fill: false, color: COLOR_MAXIMO, weight: 3 }}
+                  />
+                )}
                 {/* §7 — el contorno señala la prioridad piloto SIN alterar el
                     color de la clase de recurrencia. */}
                 {priorizado && (
