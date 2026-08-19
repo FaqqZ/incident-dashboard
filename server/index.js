@@ -141,7 +141,14 @@ app.get("/api/dashboard", (req, res) => {
     porTurno: R.countBy(f, "turno"),
     porMes: R.porMes(f),
     rankingPuntos: R.rankingPuntos(f, 12),
-    puntos: R.buildMapPoints(f),
+    // Puntos ya clasificados con la metodología del COMM (P75/P90/P95 sobre lo
+    // FILTRADO). El mapa del tablero dibuja puntos discretos por clase, igual
+    // que el de siniestros viales, en vez de una mancha de calor.
+    ...(() => {
+      const meses = new Set(state.records.filter((r) => r.mes).map((r) => r.mes)).size || 1;
+      const { puntos, cortes, clasificacionUtil } = R.clasificarPuntos(f, meses);
+      return { puntos, cortes, clasificacionUtil, mesesObservados: meses };
+    })(),
     totalFiltrado: f.length,
   });
 });

@@ -528,6 +528,74 @@ function percentilInc(ordenados, q) {
   return lo === hi ? ordenados[lo] : ordenados[lo] + (ordenados[hi] - ordenados[lo]) * (i - lo);
 }
 
+// Agrupa por cámara y clasifica con los percentiles del conjunto recibido.
+// Se usa tanto en el análisis por categoría como en el mapa del tablero, así
+// los dos hablan el mismo idioma de colores.
+function clasificarPuntos(registros, mesesObservados = 1, persistenciaMinima = 50) {
+  const porDisp = new Map();
+  registros.forEach((r) => {
+    if (r.lat === null || r.lng === null) return;
+    if (!porDisp.has(r.dispositivo)) {
+      porDisp.set(r.dispositivo, {
+        dispositivo: r.dispositivo,
+        ubicacion: r.direccion,
+        lat: r.lat,
+        lng: r.lng,
+        svAcumulados: 0,
+        meses: new Set(),
+        porCategoria: {},
+      });
+    }
+    const p = porDisp.get(r.dispositivo);
+    p.svAcumulados += 1;
+    if (r.mes) p.meses.add(r.mes);
+    const cat = r.categoria || "Sin categoría";
+    p.porCategoria[cat] = (p.porCategoria[cat] || 0) + 1;
+  });
+
+  const counts = Array.from(porDisp.values())
+    .map((p) => p.svAcumulados)
+    .sort((a, b) => a - b);
+
+  const cortes = counts.length
+    ? { p75: percentilInc(counts, 0.75), p90: percentilInc(counts, 0.9), p95: percentilInc(counts, 0.95) }
+    : { p75: 0, p90: 0, p95: 0 };
+
+  // Con conjuntos chicos los tres percentiles pueden caer en el mismo entero:
+  // ahí la clasificación no discrimina y la vista lo tiene que avisar en vez de
+  // dibujar clases que no significan nada.
+  const clasificacionUtil =
+    new Set([Math.ceil(cortes.p75), Math.ceil(cortes.p90), Math.ceil(cortes.p95)]).size === 3;
+
+  const puntos = Array.from(porDisp.values()).map((p) => {
+    const idx =
+      p.svAcumulados >= cortes.p95 ? 0 : p.svAcumulados >= cortes.p90 ? 1 : p.svAcumulados >= cortes.p75 ? 2 : 3;
+    const def = ESCALA_RECURRENCIA[idx];
+    const mesesConSV = p.meses.size;
+    const persistencia = +((mesesConSV / mesesObservados) * 100).toFixed(4);
+    return {
+      dispositivo: p.dispositivo,
+      ubicacion: p.ubicacion,
+      direccion: p.ubicacion, // el popup del tablero lo lee así
+      lat: p.lat,
+      lng: p.lng,
+      count: p.svAcumulados,
+      porCategoria: p.porCategoria,
+      svAcumulados: p.svAcumulados,
+      svPromedioMensual: +(p.svAcumulados / mesesObservados).toFixed(4),
+      mesesConSV,
+      persistencia,
+      clase: def.clase,
+      color: def.color,
+      // Mismo criterio del COMM: recurrencia alta o muy alta SOSTENIDA.
+      prioridad:
+        def.prioridad && persistencia >= persistenciaMinima ? def.prioridad : "SIN PRIORIDAD",
+    };
+  });
+
+  return { puntos, cortes, clasificacionUtil };
+}
+
 function analizarCategoria(records, categoria, { persistenciaMinima = 50 } = {}) {
   const filtrados = categoria ? records.filter((r) => r.categoria === categoria) : records;
 
@@ -581,60 +649,11 @@ function analizarCategoria(records, categoria, { persistenciaMinima = 50 } = {})
   }));
 
   // --- Puntos por cámara, con clase y persistencia ---
-  const porDisp = new Map();
-  filtrados.forEach((r) => {
-    if (r.lat === null || r.lng === null) return;
-    if (!porDisp.has(r.dispositivo)) {
-      porDisp.set(r.dispositivo, {
-        dispositivo: r.dispositivo,
-        ubicacion: r.direccion,
-        lat: r.lat,
-        lng: r.lng,
-        svAcumulados: 0,
-        meses: new Set(),
-      });
-    }
-    const p = porDisp.get(r.dispositivo);
-    p.svAcumulados += 1;
-    if (r.mes) p.meses.add(r.mes);
-  });
-
-  const counts = Array.from(porDisp.values())
-    .map((p) => p.svAcumulados)
-    .sort((a, b) => a - b);
-
-  const cortes = counts.length
-    ? { p75: percentilInc(counts, 0.75), p90: percentilInc(counts, 0.9), p95: percentilInc(counts, 0.95) }
-    : { p75: 0, p90: 0, p95: 0 };
-
-  // Con categorías chicas los tres percentiles pueden caer en el mismo entero:
-  // ahí la clasificación no discrimina y la vista lo tiene que avisar en vez de
-  // dibujar clases que no significan nada.
-  const clasificacionUtil =
-    new Set([Math.ceil(cortes.p75), Math.ceil(cortes.p90), Math.ceil(cortes.p95)]).size === 3;
-
-  const puntos = Array.from(porDisp.values()).map((p) => {
-    const idx =
-      p.svAcumulados >= cortes.p95 ? 0 : p.svAcumulados >= cortes.p90 ? 1 : p.svAcumulados >= cortes.p75 ? 2 : 3;
-    const def = ESCALA_RECURRENCIA[idx];
-    const mesesConSV = p.meses.size;
-    const persistencia = +((mesesConSV / mesesObservados) * 100).toFixed(4);
-    return {
-      dispositivo: p.dispositivo,
-      ubicacion: p.ubicacion,
-      lat: p.lat,
-      lng: p.lng,
-      svAcumulados: p.svAcumulados,
-      svPromedioMensual: +(p.svAcumulados / mesesObservados).toFixed(4),
-      mesesConSV,
-      persistencia,
-      clase: def.clase,
-      color: def.color,
-      // Mismo criterio del COMM: recurrencia alta o muy alta SOSTENIDA.
-      prioridad:
-        def.prioridad && persistencia >= persistenciaMinima ? def.prioridad : "SIN PRIORIDAD",
-    };
-  });
+  const { puntos, cortes, clasificacionUtil } = clasificarPuntos(
+    filtrados,
+    mesesObservados,
+    persistenciaMinima
+  );
 
   const ultimo = porMes[porMes.length - 1]?.value ?? 0;
   const previo = porMes[porMes.length - 2]?.value ?? 0;
@@ -853,6 +872,7 @@ function loadIndicadoresSV(filePath, anio = 2026) {
 module.exports = {
   loadIndicadoresSV,
   analizarCategoria,
+  clasificarPuntos,
   loadIncidents,
   applyFilters,
   countBy,

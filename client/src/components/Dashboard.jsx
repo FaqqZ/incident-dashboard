@@ -11,10 +11,11 @@ import KpiCard from "./KpiCard";
 import CategoryBarChart from "./CategoryBarChart";
 import RankingChart from "./RankingChart";
 import TrendLineChart from "./TrendLineChart";
-import IncidentMap from "./IncidentMap";
+import RecurrenciaMap from "./RecurrenciaMap";
 import ExportButton from "./ExportButton";
 
-const nf = (n) => (n ?? 0).toLocaleString("es-AR");
+const nf = (n, d = 0) =>
+  (n ?? 0).toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
 
 export default function Dashboard() {
   const { filters } = useFilters();
@@ -97,14 +98,35 @@ export default function Dashboard() {
               </section>
 
               {/* --- Mapa a todo el ancho (protagonista) --- */}
+              {/* Mismo tipo de vista que siniestros viales: puntos discretos
+                  clasificados por recurrencia, no un mapa de calor difuminado. */}
               <section className="map-section">
                 <div className="panel panel-full-width">
-                  <h3>Mapa de incidentes</h3>
-                  <p className="panel-sub">Concentración por cámara · tamaño = cantidad</p>
-                  {/* mesesObservados alimenta el indicador del COMM
-                      (promedio mensual = acumulado / meses observados). */}
-                  <IncidentMap points={data.puntos} categoriaPrincipal={data.categoriaPrincipal}
-                    mesesObservados={data.porMes?.length || 1} />
+                  <h3>Recurrencia territorial de incidentes</h3>
+                  <p className="panel-sub">
+                    Percentiles P75/P90/P95 sobre {nf(data.puntos.length)} cámaras de la vista
+                    actual · el color indica la recurrencia relativa del punto, no un nivel de
+                    riesgo
+                  </p>
+
+                  {!data.clasificacionUtil && (
+                    <div className="banner-warning" style={{ marginBottom: 16 }}>
+                      <strong>La clasificación no discrimina con este filtro.</strong> Los cortes
+                      caen en {nf(Math.ceil(data.cortes.p75))} / {nf(Math.ceil(data.cortes.p90))} /{" "}
+                      {nf(Math.ceil(data.cortes.p95))} incidentes, así que dos o más clases quedan
+                      pegadas. Conviene leer el acumulado de cada punto antes que su color.
+                    </div>
+                  )}
+
+                  <div className="recurrencia-resumen">
+                    <span><b>{nf(data.puntos.length)}</b> cámaras con registros</span>
+                    <span>
+                      Cortes: <b>{nf(data.cortes.p75, 2)}</b> / <b>{nf(data.cortes.p90, 2)}</b> /{" "}
+                      <b>{nf(data.cortes.p95, 2)}</b> incidentes
+                    </span>
+                  </div>
+
+                  <RecurrenciaMap puntos={data.puntos} />
                 </div>
               </section>
 
