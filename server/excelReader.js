@@ -8,6 +8,7 @@
 
 const XLSX = require("xlsx");
 const fs = require("fs");
+const path = require("path");
 
 // ---------------------------------------------------------------------------
 // Utilidades de texto / detección de columnas
@@ -869,7 +870,58 @@ function loadIndicadoresSV(filePath, anio = 2026) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Vaciar la base de incidentes
+//
+// Deja la hoja de incidentes con SOLO los encabezados y conserva la hoja de
+// cámaras: las coordenadas son datos de referencia que no cambian con la carga
+// mensual, y sin ellas el mapa quedaría inservible aunque después se suba un
+// Excel nuevo. Antes de tocar nada se guarda una copia con fecha.
+// ---------------------------------------------------------------------------
+function vaciarIncidentes(filePath, backupDir) {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`No se encontró el Excel en: ${filePath}`);
+  }
+
+  const wb = XLSX.readFile(filePath, { cellDates: true });
+  const bdSheet = findSheetName(wb, { exact: ["bd"], contains: ["bd", "incident", "base"] });
+  const camSheet = findSheetName(wb, {
+    contains: ["actualizado", "coordenadas-cam-actualizado", "camaras", "cámaras"],
+  });
+  if (!bdSheet) throw new Error('No se encontró la hoja de incidentes en el Excel.');
+
+  const filas = XLSX.utils.sheet_to_json(wb.Sheets[bdSheet], { defval: "" });
+  const encabezados = XLSX.utils.sheet_to_json(wb.Sheets[bdSheet], { header: 1 })[0] || [];
+  if (!encabezados.length) {
+    throw new Error("La hoja de incidentes no tiene encabezados: no se puede vaciar sin perder su estructura.");
+  }
+
+  // Respaldo primero. Si esto falla, no se toca el original.
+  if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+  const sello = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const backup = path.join(backupDir, `incidentes-${sello}.xlsx`);
+  fs.copyFileSync(filePath, backup);
+
+  wb.Sheets[bdSheet] = XLSX.utils.aoa_to_sheet([encabezados]);
+  XLSX.writeFile(wb, filePath);
+
+  const camaras = camSheet
+    ? XLSX.utils.sheet_to_json(wb.Sheets[camSheet], { defval: "" }).length
+    : 0;
+
+  return {
+    filasBorradas: filas.length,
+    encabezados,
+    hojaIncidentes: bdSheet,
+    hojaCamaras: camSheet,
+    camarasConservadas: camaras,
+    backup: path.basename(backup),
+    backupPath: backup,
+  };
+}
+
 module.exports = {
+  vaciarIncidentes,
   loadIndicadoresSV,
   analizarCategoria,
   clasificarPuntos,

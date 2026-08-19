@@ -38,6 +38,10 @@ export default function DataUpload() {
   const [health, setHealth] = useState(null);
   const [reloading, setReloading] = useState(false);
   const [reloadError, setReloadError] = useState(null);
+  const [confirmLimpiar, setConfirmLimpiar] = useState("");
+  const [limpiando, setLimpiando] = useState(false);
+  const [limpiarError, setLimpiarError] = useState(null);
+  const [limpiarOk, setLimpiarOk] = useState(null);
 
   useEffect(() => {
     loadHealth();
@@ -155,6 +159,36 @@ export default function DataUpload() {
       setUploadError("Error de conexión al subir el archivo");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleLimpiar = async () => {
+    setLimpiando(true);
+    setLimpiarError(null);
+    setLimpiarOk(null);
+    try {
+      const token = sessionStorage.getItem("uploadToken");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["x-upload-token"] = token;
+
+      const res = await fetch("/api/limpiar", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ confirmacion: "LIMPIAR" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLimpiarError(data.error || "No se pudo limpiar la base");
+        return;
+      }
+      setLimpiarOk(data);
+      setConfirmLimpiar("");
+      increment();
+      await loadHealth();
+    } catch (err) {
+      setLimpiarError("Error de conexión al limpiar la base");
+    } finally {
+      setLimpiando(false);
     }
   };
 
@@ -456,6 +490,63 @@ export default function DataUpload() {
             style={{ width: "100%" }}
           >
             {reloading ? "Recargando..." : "Recargar datos"}
+          </button>
+        </section>
+        )}
+
+        {/* --- Zona de riesgo --- */}
+        {cargaHabilitada && (
+        <section className="panel zona-riesgo" style={{ marginTop: 20 }}>
+          <h3>Limpiar base de datos</h3>
+          <p className="panel-sub">
+            Borra los incidentes cargados y deja el tablero en cero
+          </p>
+
+          <div className="banner-warning" style={{ marginBottom: 16 }}>
+            Se van a borrar <strong>{nf(health.totalRegistros)} incidentes</strong>. Las{" "}
+            <strong>{nf(health.meta?.camaras?.camaras)} cámaras</strong> y sus coordenadas se
+            conservan, porque son datos de referencia y sin ellas el mapa quedaría inservible
+            aunque después subas un Excel nuevo.
+            <br />
+            <br />
+            Antes de borrar se guarda una copia con fecha en{" "}
+            <code>server/data/backups/</code>, así se puede volver atrás.
+          </div>
+
+          {limpiarError && (
+            <div className="banner-error" style={{ marginBottom: 12 }}>{limpiarError}</div>
+          )}
+
+          {limpiarOk && (
+            <div className="banner-success" style={{ marginBottom: 12 }}>
+              ✓ Base vaciada: se borraron {nf(limpiarOk.filasBorradas)} incidentes y se
+              conservaron {nf(limpiarOk.camarasConservadas)} cámaras.
+              <br />
+              Copia de seguridad: <code>{limpiarOk.backup}</code>
+            </div>
+          )}
+
+          <div className="field" style={{ maxWidth: 320 }}>
+            <label htmlFor="conf-limpiar">
+              Escribí <b>LIMPIAR</b> para habilitar el botón
+            </label>
+            <input
+              id="conf-limpiar"
+              type="text"
+              value={confirmLimpiar}
+              onChange={(e) => setConfirmLimpiar(e.target.value)}
+              placeholder="LIMPIAR"
+              autoComplete="off"
+            />
+          </div>
+
+          <button
+            onClick={handleLimpiar}
+            disabled={confirmLimpiar.trim().toUpperCase() !== "LIMPIAR" || limpiando}
+            className="btn btn-peligro"
+            style={{ width: "100%", marginTop: 14 }}
+          >
+            {limpiando ? "Limpiando…" : "Limpiar base de datos"}
           </button>
         </section>
         )}

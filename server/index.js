@@ -246,6 +246,25 @@ app.post("/api/upload", rechazarSiServerless, requireUploadToken, upload.single(
   }
 });
 
+// Vacía la base de incidentes. Pide una confirmación escrita en el cuerpo para
+// que un POST suelto —un reintento, un curl de prueba— no pueda borrar nada.
+// Siempre deja un respaldo con fecha en server/data/backups/.
+app.post("/api/limpiar", rechazarSiServerless, requireUploadToken, (req, res) => {
+  if (req.body?.confirmacion !== "LIMPIAR") {
+    return res.status(400).json({
+      error: 'Falta la confirmación: se espera {"confirmacion":"LIMPIAR"} en el cuerpo.',
+    });
+  }
+  try {
+    const info = R.vaciarIncidentes(EXCEL_PATH, path.join(DATA_DIR, "backups"));
+    reload();
+    if (state.error) return res.status(500).json({ error: state.error });
+    res.json({ ok: true, ...info, totalRegistros: state.records.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/reload", requireUploadToken, (req, res) => {
   reload();
   res.json({ ok: !state.error, error: state.error, totalRegistros: state.records.length });

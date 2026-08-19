@@ -11,3 +11,6 @@ server/data/tmp/
 # OJO: server/data/incidentes.xlsx SÍ se versiona (es el dato semilla que
 # necesita el deploy). Contiene incidentes reales de Seguridad Ciudadana, así
 # que este repositorio tiene que ser PRIVADO.
+
+# Respaldos que genera "Limpiar base de datos"
+server/data/backups/

@@ -1205,3 +1205,29 @@
 .leyenda-anillo-max {
   border: 2px solid var(--color-1);
 }
+
+/* --- Zona de riesgo: limpiar la base --- */
+.zona-riesgo {
+  border-color: var(--err-border);
+}
+
+.zona-riesgo h3 {
+  color: var(--err-ink);
+}
+
+.btn-peligro {
+  background: var(--err-bg);
+  border-color: var(--err-border);
+  color: var(--err-ink);
+}
+
+.btn-peligro:hover:not(:disabled) {
+  background: var(--c5);
+  border-color: var(--c5);
+  color: #fff;
+}
+
+.btn-peligro:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
