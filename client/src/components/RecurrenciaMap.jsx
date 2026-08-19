@@ -72,7 +72,24 @@ function Redimensionar() {
   return null;
 }
 
-export default function RecurrenciaMap({ puntos }) {
+// El instructivo del COMM (§6) fija los nombres de los campos del tooltip para
+// el mapa de siniestros viales, así que "SV" es el valor por defecto. Pero el
+// mismo mapa se usa para el resto de las categorías, donde hablar de "SV" o de
+// "meses con SV" no significa nada: esas vistas pasan etiquetas genéricas.
+export const ETIQUETAS_SV = {
+  acumulados: "SV acumulados",
+  promedio: "SV promedio mensual",
+  meses: "Meses con SV",
+};
+
+export const ETIQUETAS_GENERICAS = {
+  acumulados: "Incidentes acumulados",
+  promedio: "Promedio mensual",
+  meses: "Meses con registros",
+};
+
+export default function RecurrenciaMap({ puntos, etiquetas }) {
+  const textos = etiquetas || ETIQUETAS_SV;
   const [pantallaCompleta, setPantallaCompleta] = useState(false);
   const contenedorRef = useRef(null);
 
@@ -195,11 +212,11 @@ export default function RecurrenciaMap({ puntos }) {
                     <br />
                     {p.ubicacion}
                     <hr />
-                    SV acumulados: <b>{nf(p.svAcumulados)}</b>
+                    {textos.acumulados}: <b>{nf(p.svAcumulados)}</b>
                     <br />
-                    SV promedio mensual: <b>{nf(p.svPromedioMensual, 2)}</b>
+                    {textos.promedio}: <b>{nf(p.svPromedioMensual, 2)}</b>
                     <br />
-                    Meses con SV: <b>{nf(p.mesesConSV)}</b>
+                    {textos.meses}: <b>{nf(p.mesesConSV)}</b>
                     <br />
                     Persistencia: <b>{nf(p.persistencia, 1)}%</b>
                     <br />

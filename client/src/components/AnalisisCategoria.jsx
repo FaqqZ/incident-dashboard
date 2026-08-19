@@ -16,7 +16,7 @@ import {
   CartesianGrid, Cell, LabelList,
 } from "recharts";
 import { fetchAnalisisCategoria, fetchOptions } from "../api";
-import RecurrenciaMap, { COLOR_HEX } from "./RecurrenciaMap";
+import RecurrenciaMap, { COLOR_HEX, ETIQUETAS_GENERICAS } from "./RecurrenciaMap";
 import KpiCard from "./KpiCard";
 
 const nf = (n, d = 0) =>
@@ -190,7 +190,7 @@ export default function AnalisisCategoria() {
                 </span>
               </div>
 
-              <RecurrenciaMap puntos={data.puntos} />
+              <RecurrenciaMap puntos={data.puntos} etiquetas={ETIQUETAS_GENERICAS} />
             </section>
 
             {priorizados.length > 0 ? (

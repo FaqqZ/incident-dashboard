@@ -11,7 +11,7 @@ import KpiCard from "./KpiCard";
 import CategoryBarChart from "./CategoryBarChart";
 import RankingChart from "./RankingChart";
 import TrendLineChart from "./TrendLineChart";
-import RecurrenciaMap from "./RecurrenciaMap";
+import RecurrenciaMap, { ETIQUETAS_GENERICAS } from "./RecurrenciaMap";
 import ExportButton from "./ExportButton";
 
 const nf = (n, d = 0) =>
@@ -126,7 +126,7 @@ export default function Dashboard() {
                     </span>
                   </div>
 
-                  <RecurrenciaMap puntos={data.puntos} />
+                  <RecurrenciaMap puntos={data.puntos} etiquetas={ETIQUETAS_GENERICAS} />
                 </div>
               </section>
 
