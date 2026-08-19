@@ -18,19 +18,11 @@ import {
 import { fetchAnalisisCategoria, fetchOptions } from "../api";
 import RecurrenciaMap, { COLOR_HEX, ETIQUETAS_GENERICAS } from "./RecurrenciaMap";
 import KpiCard from "./KpiCard";
+import { SERIE, MAXIMO, TOOLTIP, indiceMaximo, colorSegunMaximo, dotMaximo } from "../chartTheme";
 
 const nf = (n, d = 0) =>
   (n ?? 0).toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
-
-const tip = {
-  contentStyle: {
-    borderRadius: 10, border: "1px solid var(--border)", fontSize: 13,
-    background: "var(--surface-2)",
-  },
-  labelStyle: { color: "var(--ink-2)" },
-  itemStyle: { color: "var(--ink)" },
-};
 
 export default function AnalisisCategoria() {
   const [categorias, setCategorias] = useState([]);
@@ -52,6 +44,8 @@ export default function AnalisisCategoria() {
   const k = data?.kpis;
   const variacion = k?.variacionUltimoMes;
   const ultimoMes = data?.porMes?.[data.porMes.length - 1]?.name;
+  const idxMes = indiceMaximo(data?.porMes || []);
+  const idxDia = indiceMaximo(data?.porDiaSemana || []);
   const priorizados = (data?.puntos || [])
     .filter((p) => p.prioridad !== "SIN PRIORIDAD")
     .sort((a, b) => b.svAcumulados - a.svAcumulados);
@@ -99,16 +93,16 @@ export default function AnalisisCategoria() {
           <>
             <section className="kpi-grid">
               <KpiCard label="Incidentes detectados" value={nf(k.total)}
-                hint={`En ${nf(data.mesesObservados)} meses observados`} accent="var(--c1)" />
+                hint={`En ${nf(data.mesesObservados)} meses observados`} accent="var(--color-3)" />
               <KpiCard label="Promedio diario" value={nf(k.promedioDiario, 2)}
-                hint={`Sobre ${nf(k.diasPeriodo)} días del período`} accent="var(--c2)" />
+                hint={`Sobre ${nf(k.diasPeriodo)} días del período`} accent="var(--color-4)" />
               <KpiCard label="Var. último mes"
                 value={variacion === null ? "—" : `${variacion > 0 ? "+" : ""}${nf(variacion, 2)}%`}
                 hint={ultimoMes ? `${cap(ultimoMes)} contra el mes previo` : ""}
                 accent={variacion > 0 ? "var(--c5)" : "var(--c4)"} />
               <KpiCard label="Subcategoría principal" value={k.subTop?.name || "—"}
                 hint={k.subTop ? `${nf(k.subTop.value)} de ${nf(k.total)} casos` : ""}
-                accent="var(--c3)" />
+                accent="var(--color-1)" />
             </section>
 
             <section className="charts-section" style={{ marginBottom: 20 }}>
@@ -117,20 +111,20 @@ export default function AnalisisCategoria() {
                 <p className="panel-sub">{categoria}</p>
                 <ResponsiveContainer width="100%" height={280}>
                   <AreaChart data={data.porMes.map((m) => ({ ...m, label: cap(m.name) }))}
-                    margin={{ left: -18, right: 16, top: 22 }}>
+                    margin={{ left: -18, right: 30, top: 24 }}>
                     <defs>
                       <linearGradient id="fillCat" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--c2)" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="var(--c2)" stopOpacity={0.02} />
+                        <stop offset="0%" stopColor={SERIE} stopOpacity={0.35} />
+                        <stop offset="100%" stopColor={SERIE} stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid vertical={false} stroke="var(--border)" />
                     <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--ink-3)" }} />
                     <YAxis tick={{ fontSize: 12, fill: "var(--ink-3)" }} allowDecimals={false} />
-                    <Tooltip {...tip} formatter={(v) => [v, "Incidentes"]} />
-                    <Area type="monotone" dataKey="value" name="Incidentes" stroke="var(--c2)"
-                      strokeWidth={2.5} fill="url(#fillCat)"
-                      dot={{ r: 4, fill: "var(--c2)", stroke: "var(--surface)", strokeWidth: 2 }}>
+                    <Tooltip {...TOOLTIP} formatter={(v) => [v, "Incidentes"]} />
+                    <Area type="monotone" dataKey="value" name="Incidentes" stroke={SERIE}
+                      strokeWidth={2.5} fill="url(#fillCat)" isAnimationActive={false}
+                      dot={dotMaximo(idxMes)}>
                       <LabelList dataKey="value" position="top" offset={10}
                         style={{ fill: "var(--ink)", fontSize: 12, fontWeight: 600 }} />
                     </Area>
@@ -149,10 +143,12 @@ export default function AnalisisCategoria() {
                     <CartesianGrid vertical={false} stroke="var(--border)" />
                     <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--ink-3)" }} interval={0} />
                     <YAxis tick={{ fontSize: 12, fill: "var(--ink-3)" }} />
-                    <Tooltip {...tip}
+                    <Tooltip {...TOOLTIP}
                       formatter={(v, n, p) => [`${nf(v, 2)} por día (${p.payload.total} en total)`, "Promedio"]} />
-                    <Bar dataKey="value" name="Promedio" radius={[6, 6, 0, 0]} maxBarSize={54}
-                      fill="var(--c2)">
+                    <Bar dataKey="value" name="Promedio" radius={[6, 6, 0, 0]} maxBarSize={54} isAnimationActive={false}>
+                      {data.porDiaSemana.map((d, i) => (
+                        <Cell key={d.name} fill={colorSegunMaximo(i, idxDia)} />
+                      ))}
                       <LabelList dataKey="value" position="top" offset={8}
                         formatter={(v) => nf(v, 1)}
                         style={{ fill: "var(--ink)", fontSize: 11, fontWeight: 600 }} />
@@ -206,11 +202,11 @@ export default function AnalisisCategoria() {
                     <XAxis type="number" tick={{ fontSize: 12, fill: "var(--ink-3)" }} allowDecimals={false} />
                     <YAxis type="category" dataKey="ubicacion" width={250} interval={0}
                       tick={{ fontSize: 11, fill: "var(--ink-2)" }} />
-                    <Tooltip cursor={{ fill: "var(--brand-050)" }} {...tip}
+                    <Tooltip cursor={{ fill: "var(--brand-050)" }} {...TOOLTIP}
                       formatter={(v, n, p) =>
                         [`${v} incidentes · persistencia ${nf(p.payload.persistencia, 1)}% · ${p.payload.prioridad}`,
                           p.payload.dispositivo]} />
-                    <Bar dataKey="svAcumulados" radius={[0, 6, 6, 0]} maxBarSize={22}>
+                    <Bar dataKey="svAcumulados" radius={[0, 6, 6, 0]} maxBarSize={22} isAnimationActive={false}>
                       {priorizados.map((p) => (
                         <Cell key={p.dispositivo} fill={COLOR_HEX[p.color] || COLOR_HEX["SIN SEÑAL"]} />
                       ))}

@@ -16,11 +16,7 @@ import {
 const nf = (v) => (v ?? 0).toLocaleString("es-AR");
 import { useFilters } from "../store/useFilters";
 import { useNarrowScreen } from "../hooks/useNarrowScreen";
-
-const PALETTE = [
-  "var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)",
-  "var(--c5)", "var(--c6)", "var(--c7)", "var(--c8)",
-];
+import { SERIE, TOOLTIP, indiceMaximo, colorSegunMaximo } from "../chartTheme";
 
 export default function CategoryBarChart({ data }) {
   const { filters, toggleFilter } = useFilters();
@@ -33,6 +29,7 @@ export default function CategoryBarChart({ data }) {
   // Alto proporcional a la cantidad de categorías, con piso y techo: el backend
   // no limita la lista y puede devolver ~30.
   const height = Math.min(760, Math.max(320, data.length * 46));
+  const idxMax = indiceMaximo(data);
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -47,17 +44,7 @@ export default function CategoryBarChart({ data }) {
           interval={0}
           tick={{ fontSize: narrow || data.length > 14 ? 11 : 13, fill: "var(--ink-2)" }}
         />
-        <Tooltip
-          cursor={{ fill: "var(--brand-050)" }}
-          contentStyle={{
-            borderRadius: 10,
-            border: "1px solid var(--border)",
-            fontSize: 13,
-            background: "var(--surface-2)",
-          }}
-          labelStyle={{ color: "var(--ink-2)" }}
-          itemStyle={{ color: "var(--ink)" }}
-        />
+        <Tooltip cursor={{ fill: "var(--brand-050)" }} {...TOOLTIP} />
         <Bar
           dataKey="value"
           radius={[0, 6, 6, 0]}
@@ -73,7 +60,7 @@ export default function CategoryBarChart({ data }) {
             return (
               <Cell
                 key={entry.name}
-                fill={PALETTE[i % PALETTE.length]}
+                fill={colorSegunMaximo(i, idxMax)}
                 fillOpacity={active ? 1 : 0.28}
               />
             );

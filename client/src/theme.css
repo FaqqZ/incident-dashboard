@@ -27,6 +27,24 @@
   --ink-2: #a8bdd6;
   --ink-3: #8aa3bf;
 
+  /* Paleta institucional para gráficos. Coincide con el isotipo Ciudad SMT. */
+  --color-1: #f4dc00; /* amarillo — SIEMPRE el valor máximo */
+  --color-2: #333;
+  --color-3: #06f; /* azul — serie principal */
+  --color-4: #2eb1ff; /* celeste — serie secundaria */
+  --color-5: #333;
+
+  /* Alias semánticos: los gráficos usan estos, no los tokens crudos, para que
+     "el máximo" sea un concepto y no un color repetido a mano en cada archivo. */
+  --graf-serie: var(--color-3);
+  --graf-serie-2: var(--color-4);
+  --graf-max: var(--color-1);
+
+  /* OJO con --color-2 y --color-5 (#333): sobre el navy del tablero dan un
+     contraste de 1,35:1, o sea que no se ven. Quedan definidos porque son parte
+     de la paleta, pero NO se usan como relleno en los paneles oscuros. Sí
+     sirven sobre superficies claras, como los marcadores del mapa. */
+
   /* Datos: secuencia categórica recalibrada para fondo oscuro.
      Las del tema claro quedaban embarradas sobre el navy. */
   --c1: #f0873f;

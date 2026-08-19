@@ -44,7 +44,7 @@
 }
 
 .topbar h1 {
-  font-size: 17px;
+  font-size: 21px;
   font-weight: 600;
   margin: 0;
   line-height: 1.2;
@@ -85,7 +85,7 @@
 }
 
 .field label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -178,7 +178,7 @@
 }
 
 .kpi .label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--ink-3);
   text-transform: uppercase;
@@ -186,7 +186,7 @@
 }
 
 .kpi .value {
-  font-size: 30px;
+  font-size: 35px;
   font-weight: 700;
   line-height: 1.1;
   margin-top: 8px;
@@ -194,7 +194,7 @@
 }
 
 .kpi .hint {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink-3);
   margin-top: 4px;
 }
@@ -287,13 +287,13 @@
 }
 
 .panel h3 {
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 600;
   margin: 0 0 2px;
 }
 
 .panel .panel-sub {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--ink-3);
   margin: 0 0 14px;
 }

@@ -7,11 +7,14 @@ import {
 
 const nf = (v) => (v ?? 0).toLocaleString("es-AR");
 import { useNarrowScreen } from "../hooks/useNarrowScreen";
+import { TOOLTIP, indiceMaximo, colorSegunMaximo } from "../chartTheme";
 
 export default function RankingChart({ data }) {
   // El eje Y de Recharts es un ancho fijo en px: en pantallas chicas hay que
   // achicarlo (y recortar la dirección) para que quede lugar a las barras.
   const narrow = useNarrowScreen();
+
+  const idxMax = indiceMaximo(data);
 
   if (!data || data.length === 0) {
     return <div className="state">Sin datos para el filtro actual.</div>;
@@ -24,19 +27,15 @@ export default function RankingChart({ data }) {
         <YAxis type="category" dataKey="name" width={narrow ? 130 : 280}
           tickFormatter={(v) => (narrow && v?.length > 18 ? `${v.slice(0, 17)}…` : v)}
           tick={{ fontSize: narrow ? 11 : 12, fill: "var(--ink-2)" }} interval={0} />
-        <Tooltip cursor={{ fill: "var(--brand-050)" }}
-          contentStyle={{ borderRadius: 10, border: "1px solid var(--border)", fontSize: 13,
-            background: "var(--surface-2)" }}
-          labelStyle={{ color: "var(--ink-2)" }} itemStyle={{ color: "var(--ink)" }}
+        <Tooltip cursor={{ fill: "var(--brand-050)" }} {...TOOLTIP}
           formatter={(v) => [v, "Incidentes"]} />
         <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={26} isAnimationActive={false}>
           <LabelList dataKey="value" position="right" offset={8}
             formatter={nf} style={{ fill: "var(--ink)", fontSize: 12, fontWeight: 600 }} />
           {data.map((_, i) => (
-            <Cell key={i} fill={i === 0 ? "var(--c5)" : "var(--brand)"}
-              fillOpacity={i === 0 ? 1 : 0.55 + (0.45 * (data.length - i)) / data.length} />
+            <Cell key={i} fill={colorSegunMaximo(i, idxMax)} />
           ))}
-        </Bar>
+          </Bar>
       </BarChart>
     </ResponsiveContainer>
   );

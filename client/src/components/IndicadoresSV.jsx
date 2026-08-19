@@ -12,20 +12,12 @@ import {
 } from "recharts";
 import { fetchIndicadoresSV } from "../api";
 import KpiCard from "./KpiCard";
+import { SERIE, MAXIMO, TOOLTIP, indiceMaximo, colorSegunMaximo, dotMaximo } from "../chartTheme";
 
 const nf = (n, d = 0) =>
   (n ?? 0).toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
 
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
-
-const tooltipStyle = {
-  contentStyle: {
-    borderRadius: 10, border: "1px solid var(--border)", fontSize: 13,
-    background: "var(--surface-2)",
-  },
-  labelStyle: { color: "var(--ink-2)" },
-  itemStyle: { color: "var(--ink)" },
-};
 
 export default function IndicadoresSV() {
   const [data, setData] = useState(null);
@@ -57,13 +49,18 @@ export default function IndicadoresSV() {
   const variacion = k.variacionUltimoMes;
   const ultimoMes = data.porMes[data.porMes.length - 1]?.name;
 
+  // Índices del valor más alto de cada serie: ese va en amarillo.
+  const idxMes = indiceMaximo(data.porMes);
+  const idxDia = indiceMaximo(data.porDiaSemana);
+  const idxFranja = indiceMaximo(data.porFranja);
+
   return (
     <>
       <section className="kpi-grid">
         <KpiCard label="SV detectados" value={nf(k.total)}
-          hint={`Acumulado en ${data.porMes.length} meses`} accent="var(--c1)" />
+          hint={`Acumulado en ${data.porMes.length} meses`} accent="var(--color-3)" />
         <KpiCard label="Promedio diario de SV" value={nf(k.promedioDiario, 2)}
-          hint={`Sobre ${nf(k.diasPeriodo)} días del período`} accent="var(--c2)" />
+          hint={`Sobre ${nf(k.diasPeriodo)} días del período`} accent="var(--color-4)" />
         <KpiCard label="Var. último mes"
           value={variacion === null ? "—" : `${variacion > 0 ? "+" : ""}${nf(variacion, 2)}%`}
           hint={ultimoMes ? `${cap(ultimoMes)} contra el mes previo` : ""}
@@ -78,20 +75,20 @@ export default function IndicadoresSV() {
           <p className="panel-sub">Enero–julio 2026</p>
           <ResponsiveContainer width="100%" height={280}>
             <AreaChart data={data.porMes.map((m) => ({ ...m, label: cap(m.name) }))}
-              margin={{ left: -18, right: 16, top: 22 }}>
+              margin={{ left: -18, right: 30, top: 24 }}>
               <defs>
                 <linearGradient id="fillSV" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--c2)" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="var(--c2)" stopOpacity={0.02} />
+                  <stop offset="0%" stopColor={SERIE} stopOpacity={0.35} />
+                  <stop offset="100%" stopColor={SERIE} stopOpacity={0.02} />
                 </linearGradient>
               </defs>
               <CartesianGrid vertical={false} stroke="var(--border)" />
               <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--ink-3)" }} />
               <YAxis tick={{ fontSize: 12, fill: "var(--ink-3)" }} allowDecimals={false} />
-              <Tooltip {...tooltipStyle} formatter={(v) => [v, "Siniestros"]} />
-              <Area type="monotone" dataKey="value" name="Siniestros" stroke="var(--c2)"
-                strokeWidth={2.5} fill="url(#fillSV)"
-                dot={{ r: 4, fill: "var(--c2)", stroke: "var(--surface)", strokeWidth: 2 }}>
+              <Tooltip {...TOOLTIP} formatter={(v) => [v, "Siniestros"]} />
+              <Area type="monotone" dataKey="value" name="Siniestros" stroke={SERIE}
+                strokeWidth={2.5} fill="url(#fillSV)" isAnimationActive={false}
+                dot={dotMaximo(idxMes)}>
                 <LabelList dataKey="value" position="top" offset={10}
                   style={{ fill: "var(--ink)", fontSize: 12, fontWeight: 600 }} />
               </Area>
@@ -109,10 +106,12 @@ export default function IndicadoresSV() {
                 <CartesianGrid vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--ink-3)" }} interval={0} />
                 <YAxis tick={{ fontSize: 12, fill: "var(--ink-3)" }} />
-                <Tooltip {...tooltipStyle}
+                <Tooltip {...TOOLTIP}
                   formatter={(v, n, p) => [`${nf(v, 2)} por día (${p.payload.total} en total)`, "Promedio"]} />
-                <Bar dataKey="value" name="Promedio" radius={[6, 6, 0, 0]} maxBarSize={44}
-                  fill="var(--c2)">
+                <Bar dataKey="value" name="Promedio" radius={[6, 6, 0, 0]} maxBarSize={44} isAnimationActive={false}>
+                  {data.porDiaSemana.map((d, i) => (
+                    <Cell key={d.name} fill={colorSegunMaximo(i, idxDia)} />
+                  ))}
                   <LabelList dataKey="value" position="top" offset={8}
                     formatter={(v) => nf(v, 1)}
                     style={{ fill: "var(--ink)", fontSize: 11, fontWeight: 600 }} />
@@ -133,13 +132,11 @@ export default function IndicadoresSV() {
                 <XAxis dataKey="name" tick={{ fontSize: 10, fill: "var(--ink-3)" }} interval={0}
                   angle={-18} textAnchor="end" height={62} />
                 <YAxis tick={{ fontSize: 12, fill: "var(--ink-3)" }} unit="%" />
-                <Tooltip {...tooltipStyle}
+                <Tooltip {...TOOLTIP}
                   formatter={(v, n, p) => [`${nf(v, 1)}% (${p.payload.total} siniestros)`, p.payload.detalle]} />
-                <Bar dataKey="value" name="% del total" radius={[6, 6, 0, 0]} maxBarSize={52}>
-                  {data.porFranja.map((f) => (
-                    <Cell key={f.name}
-                      fill={f.value === Math.max(...data.porFranja.map((x) => x.value))
-                        ? "var(--c1)" : "var(--c2)"} />
+                <Bar dataKey="value" name="% del total" radius={[6, 6, 0, 0]} maxBarSize={52} isAnimationActive={false}>
+                  {data.porFranja.map((f, i) => (
+                    <Cell key={f.name} fill={colorSegunMaximo(i, idxFranja)} />
                   ))}
                   <LabelList dataKey="value" position="top" offset={8}
                     formatter={(v) => `${nf(v, 1)}%`}

@@ -121,7 +121,7 @@ export default function RecurrenciaPanel() {
                   background: "var(--surface-2)" }}
                 labelStyle={{ color: "var(--ink-2)" }} itemStyle={{ color: "var(--ink)" }}
                 formatter={(v, n, p) => [`${v} siniestros · ${p.payload.prioridad}`, p.payload.dispositivo]} />
-              <Bar dataKey="svAcumulados" radius={[0, 6, 6, 0]} maxBarSize={22}>
+              <Bar dataKey="svAcumulados" radius={[0, 6, 6, 0]} maxBarSize={22} isAnimationActive={false}>
                 {priorizados.map((p) => (
                   <Cell key={p.dispositivo} fill={COLOR_HEX[p.color] || COLOR_HEX["SIN SEÑAL"]} />
                 ))}
