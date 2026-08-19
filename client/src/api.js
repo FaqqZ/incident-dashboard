@@ -43,3 +43,13 @@ export async function fetchHealth() {
   const res = await fetch("/api/health");
   return res.json();
 }
+
+// --- Indicadores descriptivos de siniestralidad vial (dashboard del COMM) ---
+export async function fetchIndicadoresSV() {
+  const res = await fetch("/api/siniestros/indicadores");
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Error ${res.status} al cargar los indicadores`);
+  }
+  return res.json();
+}

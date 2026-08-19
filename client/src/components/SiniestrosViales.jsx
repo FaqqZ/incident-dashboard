@@ -7,6 +7,7 @@
 // responden a los filtros generales, confundía las dos lecturas.
 
 import { Link } from "react-router-dom";
+import IndicadoresSV from "./IndicadoresSV";
 import RecurrenciaPanel from "./RecurrenciaPanel";
 
 export default function SiniestrosViales() {
@@ -26,6 +27,7 @@ export default function SiniestrosViales() {
       </header>
 
       <main className="canvas vista-siniestros">
+        <IndicadoresSV />
         <RecurrenciaPanel />
       </main>
     </div>

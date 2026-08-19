@@ -44,6 +44,7 @@ const SINIESTRALIDAD_PATH =
   process.env.SINIESTRALIDAD_PATH || path.join(DATA_DIR, "siniestralidad.xlsx");
 
 let recurrencia = { puntos: [], meta: {}, loadedAt: null, error: null };
+let indicadoresSV = { datos: null, loadedAt: null, error: null };
 
 function reload() {
   let cameras = null;
@@ -76,6 +77,20 @@ function reload() {
   } catch (err) {
     recurrencia = { puntos: [], meta: {}, loadedAt: null, error: err.message };
     console.error("[recurrencia] Error al cargar el Excel:", err.message);
+  }
+
+  try {
+    const ind = R.loadIndicadoresSV(SINIESTRALIDAD_PATH);
+    indicadoresSV = { datos: ind, loadedAt: new Date().toISOString(), error: null };
+    console.log(
+      ind
+        ? `[indicadores] ${ind.kpis.total} siniestros | ${ind.kpis.promedioDiario}/día | ` +
+            `${ind.kpis.pctConLesiones}% con lesiones`
+        : "[indicadores] el Excel no trae hoja de registros: la vista los omite"
+    );
+  } catch (err) {
+    indicadoresSV = { datos: null, loadedAt: null, error: err.message };
+    console.error("[indicadores] Error al calcular indicadores:", err.message);
   }
 }
 reload();
@@ -151,6 +166,16 @@ app.get("/api/recurrencia", (req, res) => {
     meta: recurrencia.meta,
     loadedAt: recurrencia.loadedAt,
   });
+});
+
+// Indicadores descriptivos de siniestralidad vial. Son del período completo y
+// no se filtran: replican el dashboard que el COMM ya tiene en Excel.
+app.get("/api/siniestros/indicadores", (req, res) => {
+  if (indicadoresSV.error) return res.status(500).json({ error: indicadoresSV.error });
+  if (!indicadoresSV.datos) {
+    return res.status(404).json({ error: "El Excel cargado no trae la hoja de registros" });
+  }
+  res.json({ ...indicadoresSV.datos, loadedAt: indicadoresSV.loadedAt });
 });
 
 app.get("/api/recurrencia/options", (req, res) => {

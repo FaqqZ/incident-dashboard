@@ -541,7 +541,143 @@ function buildFilterOptions(records) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Indicadores del dashboard de siniestralidad vial (hoja "Hoja1" del Excel del
+// COMM: una fila por siniestro detectado).
+//
+// Todo se calcula acá, pero los números están verificados contra el dashboard
+// que el COMM ya armó en Excel: 498 detectados, 2,35 diarios, -11,34% de
+// variación, 50,6% con lesiones, y las mismas franjas horarias.
+// ---------------------------------------------------------------------------
+
+const DIAS_SEMANA = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+
+// Franjas horarias tal como las define el dashboard del COMM.
+const FRANJAS = [
+  { name: "Madrugada", detalle: "00:00–03:59", desde: 0, hasta: 3 },
+  { name: "Mañana temprana", detalle: "04:00–07:59", desde: 4, hasta: 7 },
+  { name: "Mañana", detalle: "08:00–11:59", desde: 8, hasta: 11 },
+  { name: "Mediodía / primera tarde", detalle: "12:00–15:59", desde: 12, hasta: 15 },
+  { name: "Tarde", detalle: "16:00–19:59", desde: 16, hasta: 19 },
+  { name: "Noche", detalle: "20:00–23:59", desde: 20, hasta: 23 },
+];
+
+const DIAS_POR_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+function esBisiesto(anio) {
+  return (anio % 4 === 0 && anio % 100 !== 0) || anio % 400 === 0;
+}
+
+function loadIndicadoresSV(filePath, anio = 2026) {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`No se encontró el Excel de siniestralidad en: ${filePath}`);
+  }
+  const wb = XLSX.readFile(filePath);
+  const hoja = findSheetName(wb, { exact: ["Hoja1"], contains: ["hoja1"] });
+  if (!hoja) return null; // el Excel viejo solo traía Hoja2: la vista degrada sin romperse
+
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[hoja], { defval: "" });
+  if (!rows.length) return null;
+
+  const headers = Object.keys(rows[0]);
+  const colMes = pickColumn(headers, ["mes"]);
+  const colSub = pickColumn(headers, ["subcategoria", "subcategoría"]);
+  const colDia = pickColumn(headers, ["día de semana", "dia de semana"]);
+  const colHora = pickColumn(headers, ["hora corregida", "hora"]);
+  const colUbic = pickColumn(headers, ["ubicación", "ubicacion"]);
+
+  const norm = (v) => String(v ?? "").trim().toLowerCase();
+
+  // --- Evolución mensual, en orden calendario ---
+  const acumMes = new Map();
+  rows.forEach((r) => {
+    const m = norm(r[colMes]);
+    if (m) acumMes.set(m, (acumMes.get(m) || 0) + 1);
+  });
+  const porMesSV = MESES_ES.map((m, i) => ({ name: m, mesnro: i + 1, value: acumMes.get(m) || 0 }))
+    .filter((m) => acumMes.has(m.name));
+
+  // Días del período: se suman los meses efectivamente presentes, que es como
+  // el COMM calcula el promedio diario (498 / 212 = 2,35).
+  const diasPeriodo = porMesSV.reduce((acc, m) => {
+    const d = DIAS_POR_MES[m.mesnro - 1];
+    return acc + (m.mesnro === 2 && esBisiesto(anio) ? d + 1 : d);
+  }, 0);
+
+  // --- Promedio por día de la semana ---
+  // Divide por cuántas veces cayó ese día en el período, no por 7: enero-julio
+  // 2026 tiene 31 jueves y viernes pero 30 del resto, y eso mueve el promedio.
+  const vecesPorDia = Object.fromEntries(DIAS_SEMANA.map((d) => [d, 0]));
+  if (porMesSV.length) {
+    const desde = new Date(anio, porMesSV[0].mesnro - 1, 1);
+    const hasta = new Date(anio, porMesSV[porMesSV.length - 1].mesnro, 0);
+    for (const d = new Date(desde); d <= hasta; d.setDate(d.getDate() + 1)) {
+      vecesPorDia[DIAS_SEMANA[(d.getDay() + 6) % 7]] += 1;
+    }
+  }
+  const acumDia = new Map();
+  rows.forEach((r) => {
+    const d = norm(r[colDia]);
+    if (d) acumDia.set(d, (acumDia.get(d) || 0) + 1);
+  });
+  const porDiaSemana = DIAS_SEMANA.map((d) => ({
+    name: d,
+    total: acumDia.get(d) || 0,
+    dias: vecesPorDia[d] || 0,
+    value: vecesPorDia[d] ? +((acumDia.get(d) || 0) / vecesPorDia[d]).toFixed(2) : 0,
+  }));
+
+  // --- Franja horaria ---
+  // Solo una parte de los registros tiene hora cargada (el resto viene "NC"),
+  // así que el porcentaje se calcula sobre ese subconjunto y se informa de qué
+  // meses sale, para no dar a entender que cubre todo el período.
+  const conHora = rows.filter((r) => Number.isFinite(Number(r[colHora])));
+  const acumFranja = new Map();
+  conHora.forEach((r) => {
+    const h = Number(r[colHora]);
+    const f = FRANJAS.find((x) => h >= x.desde && h <= x.hasta);
+    if (f) acumFranja.set(f.name, (acumFranja.get(f.name) || 0) + 1);
+  });
+  const porFranja = FRANJAS.map((f) => ({
+    name: f.name,
+    detalle: f.detalle,
+    total: acumFranja.get(f.name) || 0,
+    value: conHora.length ? +(((acumFranja.get(f.name) || 0) / conHora.length) * 100).toFixed(1) : 0,
+  }));
+  const mesesConHora = MESES_ES.filter((m) =>
+    conHora.some((r) => norm(r[colMes]) === m)
+  );
+
+  // El ranking de puntos NO se calcula acá: el gráfico del COMM sale de la hoja
+  // "Selección Piloto", que son los 16 candidatos (prioridad 1 y 2). Filtrar por
+  // "4 o más acumulados" daría 31 puntos, porque 15 llegan a 4 siniestros pero
+  // no alcanzan el 50% de persistencia. Se arma desde los puntos de recurrencia.
+
+  const conLesiones = rows.filter((r) => norm(r[colSub]).includes("con lesiones")).length;
+  const ultimo = porMesSV[porMesSV.length - 1]?.value ?? 0;
+  const previo = porMesSV[porMesSV.length - 2]?.value ?? 0;
+
+  return {
+    kpis: {
+      total: rows.length,
+      promedioDiario: diasPeriodo ? +(rows.length / diasPeriodo).toFixed(2) : 0,
+      variacionUltimoMes: previo ? +(((ultimo - previo) / previo) * 100).toFixed(2) : null,
+      pctConLesiones: rows.length ? +((conLesiones / rows.length) * 100).toFixed(1) : 0,
+      conLesiones,
+      diasPeriodo,
+    },
+    porMes: porMesSV,
+    porDiaSemana,
+    porFranja,
+    franjaMeses: mesesConHora,
+    franjaRegistros: conHora.length,
+
+    meta: { hoja, filas: rows.length, anio },
+  };
+}
+
 module.exports = {
+  loadIndicadoresSV,
   loadIncidents,
   applyFilters,
   countBy,

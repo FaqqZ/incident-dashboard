@@ -8,8 +8,11 @@
 // percentiles ni clases (§4). El backend solo filtra y sirve.
 
 import { useEffect, useState } from "react";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LabelList,
+} from "recharts";
 import { fetchRecurrencia, fetchRecurrenciaOptions } from "../api";
-import RecurrenciaMap from "./RecurrenciaMap";
+import RecurrenciaMap, { COLOR_HEX } from "./RecurrenciaMap";
 
 const nf = (n) => (n ?? 0).toLocaleString("es-AR");
 
@@ -34,6 +37,13 @@ export default function RecurrenciaPanel() {
   const set = (k, v) => setFiltros((f) => ({ ...f, [k]: v }));
   const hayFiltros = Object.values(filtros).some(Boolean);
   const r = data?.resumen;
+
+  // Los candidatos a piloto: recurrencia + persistencia ≥ 50%. NO es lo mismo
+  // que "4 o más acumulados": 15 puntos llegan a 4 siniestros pero no sostienen
+  // la persistencia, y por eso quedan afuera de la selección.
+  const priorizados = (data?.puntos || [])
+    .filter((p) => p.prioridad && p.prioridad !== "SIN PRIORIDAD")
+    .sort((a, b) => b.svAcumulados - a.svAcumulados);
 
   return (
     <section className="panel panel-wide" style={{ marginBottom: 20 }}>
@@ -93,6 +103,35 @@ export default function RecurrenciaPanel() {
       )}
 
       {data && <RecurrenciaMap puntos={data.puntos} />}
+
+      {priorizados.length > 0 && (
+        <>
+          <h3 style={{ marginTop: 26 }}>Puntos seleccionados para la prueba piloto</h3>
+          <p className="panel-sub">
+            Recurrencia alta o muy alta con persistencia ≥ 50% · {priorizados.length} candidatos
+          </p>
+          <ResponsiveContainer width="100%" height={Math.max(320, priorizados.length * 34)}>
+            <BarChart data={priorizados} layout="vertical" margin={{ left: 8, right: 44 }}>
+              <CartesianGrid horizontal={false} stroke="var(--border)" />
+              <XAxis type="number" tick={{ fontSize: 12, fill: "var(--ink-3)" }} allowDecimals={false} />
+              <YAxis type="category" dataKey="ubicacion" width={250} interval={0}
+                tick={{ fontSize: 11, fill: "var(--ink-2)" }} />
+              <Tooltip cursor={{ fill: "var(--brand-050)" }}
+                contentStyle={{ borderRadius: 10, border: "1px solid var(--border)", fontSize: 13,
+                  background: "var(--surface-2)" }}
+                labelStyle={{ color: "var(--ink-2)" }} itemStyle={{ color: "var(--ink)" }}
+                formatter={(v, n, p) => [`${v} siniestros · ${p.payload.prioridad}`, p.payload.dispositivo]} />
+              <Bar dataKey="svAcumulados" radius={[0, 6, 6, 0]} maxBarSize={22}>
+                {priorizados.map((p) => (
+                  <Cell key={p.dispositivo} fill={COLOR_HEX[p.color] || COLOR_HEX["SIN SEÑAL"]} />
+                ))}
+                <LabelList dataKey="svAcumulados" position="right" offset={8}
+                  style={{ fill: "var(--ink)", fontSize: 11, fontWeight: 600 }} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </>
+      )}
     </section>
   );
 }
