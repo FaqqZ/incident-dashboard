@@ -21,7 +21,7 @@ export default function SiniestrosViales() {
             alt="Ciudad SMT · Subsecretaría de Seguridad Ciudadana"
           />
           <span className="brand-divider" aria-hidden="true" />
-          <h1>Siniestros viales</h1>
+          <h1>Siniestros viales detectados por el COMM</h1>
         </div>
         <Link to="/" className="btn">Volver al tablero</Link>
       </header>
