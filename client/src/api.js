@@ -53,3 +53,13 @@ export async function fetchIndicadoresSV() {
   }
   return res.json();
 }
+
+// --- Análisis por categoría (metodología COMM generalizada) ---
+export async function fetchAnalisisCategoria(categoria) {
+  const res = await fetch(`/api/categoria/analisis${qs({ categoria })}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Error ${res.status} al cargar el análisis`);
+  }
+  return res.json();
+}

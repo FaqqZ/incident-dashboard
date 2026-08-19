@@ -4,6 +4,7 @@
 import { Routes, Route } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
 import SiniestrosViales from "./components/SiniestrosViales";
+import AnalisisCategoria from "./components/AnalisisCategoria";
 import DataUpload from "./components/DataUpload";
 
 export default function App() {
@@ -11,6 +12,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Dashboard />} />
       <Route path="/siniestros-viales" element={<SiniestrosViales />} />
+      <Route path="/analisis" element={<AnalisisCategoria />} />
       <Route path="/datos" element={<DataUpload />} />
     </Routes>
   );

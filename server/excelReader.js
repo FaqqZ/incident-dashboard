@@ -211,6 +211,7 @@ function loadIncidents(filePath, opts = {}) {
   const colDisp = pickColumn(headers, ["dispositivo", "camara", "cámara", "id_camara"]);
   const colFecha = pickColumn(headers, ["fecha", "fecha_hora", "date"]);
   const colCat = pickColumn(headers, ["categoria", "categoría", "tipo"]);
+  const colSubcat = pickColumn(headers, ["subcategoria", "subcategoría"]);
   const colTurno = pickColumn(headers, ["turno", "franja"]);
   const colNaturaleza = pickColumn(headers, ["naturaleza", "naturaleaza", "nat"]);
 
@@ -236,6 +237,7 @@ function loadIncidents(filePath, opts = {}) {
       id: records.length + 1,
       dispositivo: disp,
       categoria: clean(row[colCat]) || "Sin categoría",
+      subcategoria: clean(row[colSubcat]),
       turno: clean(row[colTurno]) || "Sin turno",
       naturaleza: clean(row[colNaturaleza]) || "Sin naturaleza",
       fecha: toISODate(date),
@@ -496,6 +498,178 @@ function filtrarRecurrencia(puntos, { clase, color, prioridad } = {}) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Análisis por categoría: generaliza la metodología del COMM (percentiles
+// P75/P90/P95 + persistencia) a cualquier categoría de la base de incidentes.
+//
+// Para "SINIESTROS VIALES." reproduce la planilla del COMM: mismas clases en
+// los 244 puntos y los mismos 9 candidatos Prioridad 1 y 7 Prioridad 2.
+//
+// NO incluye franja horaria: la columna `fecha` guarda la hora en formato de 12
+// horas sin AM/PM (coincide con la hora corregida del COMM solo en el 43% de
+// los casos, y todas las diferencias son de +12 h). Hasta que el origen exporte
+// hora en 24 h, ese gráfico daría un resultado equivocado.
+// ---------------------------------------------------------------------------
+
+// Escala completa: clase, color y a qué prioridad piloto puede aspirar.
+// (CLASES_RECURRENCIA, más arriba, es solo el orden de los nombres.)
+const ESCALA_RECURRENCIA = [
+  { clase: "MUY ALTA", color: "ROJO", prioridad: "PRIORIDAD 1" },
+  { clase: "ALTA", color: "NARANJA", prioridad: "PRIORIDAD 2" },
+  { clase: "RELEVANTE", color: "AMARILLO", prioridad: null },
+  { clase: "BAJA", color: "SIN SEÑAL", prioridad: null },
+];
+
+// PERCENTILE.INC (el método de Excel): interpolación lineal sobre q*(n-1).
+function percentilInc(ordenados, q) {
+  const i = q * (ordenados.length - 1);
+  const lo = Math.floor(i);
+  const hi = Math.ceil(i);
+  return lo === hi ? ordenados[lo] : ordenados[lo] + (ordenados[hi] - ordenados[lo]) * (i - lo);
+}
+
+function analizarCategoria(records, categoria, { persistenciaMinima = 50 } = {}) {
+  const filtrados = categoria ? records.filter((r) => r.categoria === categoria) : records;
+
+  // Meses observados: se toman de TODA la base, no de la categoría. Si una
+  // categoría no tuvo casos en marzo, marzo igual fue un mes observado y tiene
+  // que contar para el promedio y la persistencia.
+  const mesesBase = Array.from(
+    new Map(records.filter((r) => r.mes).map((r) => [r.mes, r.mesnro])).entries()
+  ).sort((a, b) => a[1] - b[1]);
+  const mesesObservados = mesesBase.length || 1;
+
+  const acumMes = new Map();
+  filtrados.forEach((r) => {
+    if (r.mes) acumMes.set(r.mes, (acumMes.get(r.mes) || 0) + 1);
+  });
+  const porMes = mesesBase.map(([name, mesnro]) => ({
+    name,
+    mesnro,
+    value: acumMes.get(name) || 0,
+  }));
+
+  const diasPeriodo = mesesBase.reduce((acc, [, mesnro]) => {
+    const anio = Number((filtrados[0]?.fecha || records[0]?.fecha || "2026").slice(0, 4));
+    const bis = (anio % 4 === 0 && anio % 100 !== 0) || anio % 400 === 0;
+    return acc + DIAS_POR_MES[mesnro - 1] + (mesnro === 2 && bis ? 1 : 0);
+  }, 0);
+
+  // --- Promedio por día de la semana ---
+  const vecesPorDia = Object.fromEntries(DIAS_SEMANA.map((d) => [d, 0]));
+  const acumDia = new Map();
+  const fechas = filtrados.map((r) => r.fecha).filter(Boolean);
+  if (mesesBase.length) {
+    const anio = Number((fechas[0] || "2026").slice(0, 4));
+    const desde = new Date(anio, mesesBase[0][1] - 1, 1);
+    const hasta = new Date(anio, mesesBase[mesesBase.length - 1][1], 0);
+    for (const d = new Date(desde); d <= hasta; d.setDate(d.getDate() + 1)) {
+      vecesPorDia[DIAS_SEMANA[(d.getDay() + 6) % 7]] += 1;
+    }
+  }
+  filtrados.forEach((r) => {
+    if (!r.fecha) return;
+    const [y, m, d] = r.fecha.split("-").map(Number);
+    const nombre = DIAS_SEMANA[(new Date(y, m - 1, d).getDay() + 6) % 7];
+    acumDia.set(nombre, (acumDia.get(nombre) || 0) + 1);
+  });
+  const porDiaSemana = DIAS_SEMANA.map((d) => ({
+    name: d,
+    total: acumDia.get(d) || 0,
+    dias: vecesPorDia[d] || 0,
+    value: vecesPorDia[d] ? +((acumDia.get(d) || 0) / vecesPorDia[d]).toFixed(2) : 0,
+  }));
+
+  // --- Puntos por cámara, con clase y persistencia ---
+  const porDisp = new Map();
+  filtrados.forEach((r) => {
+    if (r.lat === null || r.lng === null) return;
+    if (!porDisp.has(r.dispositivo)) {
+      porDisp.set(r.dispositivo, {
+        dispositivo: r.dispositivo,
+        ubicacion: r.direccion,
+        lat: r.lat,
+        lng: r.lng,
+        svAcumulados: 0,
+        meses: new Set(),
+      });
+    }
+    const p = porDisp.get(r.dispositivo);
+    p.svAcumulados += 1;
+    if (r.mes) p.meses.add(r.mes);
+  });
+
+  const counts = Array.from(porDisp.values())
+    .map((p) => p.svAcumulados)
+    .sort((a, b) => a - b);
+
+  const cortes = counts.length
+    ? { p75: percentilInc(counts, 0.75), p90: percentilInc(counts, 0.9), p95: percentilInc(counts, 0.95) }
+    : { p75: 0, p90: 0, p95: 0 };
+
+  // Con categorías chicas los tres percentiles pueden caer en el mismo entero:
+  // ahí la clasificación no discrimina y la vista lo tiene que avisar en vez de
+  // dibujar clases que no significan nada.
+  const clasificacionUtil =
+    new Set([Math.ceil(cortes.p75), Math.ceil(cortes.p90), Math.ceil(cortes.p95)]).size === 3;
+
+  const puntos = Array.from(porDisp.values()).map((p) => {
+    const idx =
+      p.svAcumulados >= cortes.p95 ? 0 : p.svAcumulados >= cortes.p90 ? 1 : p.svAcumulados >= cortes.p75 ? 2 : 3;
+    const def = ESCALA_RECURRENCIA[idx];
+    const mesesConSV = p.meses.size;
+    const persistencia = +((mesesConSV / mesesObservados) * 100).toFixed(4);
+    return {
+      dispositivo: p.dispositivo,
+      ubicacion: p.ubicacion,
+      lat: p.lat,
+      lng: p.lng,
+      svAcumulados: p.svAcumulados,
+      svPromedioMensual: +(p.svAcumulados / mesesObservados).toFixed(4),
+      mesesConSV,
+      persistencia,
+      clase: def.clase,
+      color: def.color,
+      // Mismo criterio del COMM: recurrencia alta o muy alta SOSTENIDA.
+      prioridad:
+        def.prioridad && persistencia >= persistenciaMinima ? def.prioridad : "SIN PRIORIDAD",
+    };
+  });
+
+  const ultimo = porMes[porMes.length - 1]?.value ?? 0;
+  const previo = porMes[porMes.length - 2]?.value ?? 0;
+
+  // Subcategoría dominante: lo más cercano a un "% con lesiones" que se puede
+  // dar de forma genérica, porque en el resto de las categorías la subcategoría
+  // describe el tipo y no la gravedad.
+  const acumSub = new Map();
+  filtrados.forEach((r) => {
+    const s = r.subcategoria;
+    if (s) acumSub.set(s, (acumSub.get(s) || 0) + 1);
+  });
+  const subTop = Array.from(acumSub.entries()).sort((a, b) => b[1] - a[1])[0] || null;
+
+  return {
+    categoria: categoria || "Todas las categorías",
+    kpis: {
+      total: filtrados.length,
+      promedioDiario: diasPeriodo ? +(filtrados.length / diasPeriodo).toFixed(2) : 0,
+      variacionUltimoMes: previo ? +(((ultimo - previo) / previo) * 100).toFixed(2) : null,
+      diasPeriodo,
+      camaras: puntos.length,
+      subTop: subTop ? { name: subTop[0], value: subTop[1] } : null,
+    },
+    porMes,
+    porDiaSemana,
+    puntos,
+    cortes,
+    clasificacionUtil,
+    mesesObservados,
+    persistenciaMinima,
+    resumen: resumenRecurrencia(puntos),
+  };
+}
+
 function resumenRecurrencia(puntos) {
   const cuenta = (campo, valor) => puntos.filter((p) => p[campo] === valor).length;
   const conPrioridad = puntos.filter((p) => p.prioridad !== "SIN PRIORIDAD");
@@ -678,6 +852,7 @@ function loadIndicadoresSV(filePath, anio = 2026) {
 
 module.exports = {
   loadIndicadoresSV,
+  analizarCategoria,
   loadIncidents,
   applyFilters,
   countBy,

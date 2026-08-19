@@ -168,6 +168,17 @@ app.get("/api/recurrencia", (req, res) => {
   });
 });
 
+// Análisis por categoría: la misma metodología del COMM aplicada a cualquier
+// categoría de la base de incidentes. Sin franja horaria (ver excelReader).
+app.get("/api/categoria/analisis", (req, res) => {
+  if (state.error) return res.status(500).json({ error: state.error });
+  const categoria = req.query.categoria || null;
+  if (categoria && !state.records.some((r) => r.categoria === categoria)) {
+    return res.status(404).json({ error: `No hay incidentes de la categoría "${categoria}"` });
+  }
+  res.json(R.analizarCategoria(state.records, categoria));
+});
+
 // Indicadores descriptivos de siniestralidad vial. Son del período completo y
 // no se filtran: replican el dashboard que el COMM ya tiene en Excel.
 app.get("/api/siniestros/indicadores", (req, res) => {

@@ -59,6 +59,9 @@ export default function Dashboard() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {data && <span className="updated">{nf(data.totalFiltrado)} incidentes en vista</span>}
+          <Link to="/analisis" className="btn" style={{ fontSize: "12px" }}>
+            Análisis por categoría
+          </Link>
           <Link to="/siniestros-viales" className="btn" style={{ fontSize: "12px" }}>
             Siniestros viales
           </Link>
