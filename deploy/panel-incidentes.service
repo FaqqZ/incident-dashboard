@@ -1,0 +1,40 @@
+[Unit]
+Description=Panel Operativo de Incidentes — Seguridad Ciudadana SMT
+Documentation=file:///opt/panel-incidentes/DEPLOY.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=panel
+Group=panel
+WorkingDirectory=/opt/panel-incidentes
+
+# UPLOAD_TOKEN vive acá y NO en el repo. El archivo va con permisos 600.
+EnvironmentFile=/etc/panel-incidentes.env
+Environment=NODE_ENV=production
+
+ExecStart=/usr/bin/node server/index.js
+
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=panel-incidentes
+
+# --- Endurecimiento ---
+# El proceso solo puede escribir en su directorio de datos: si algún día se
+# cuela algo por la carga de archivos, no puede tocar el resto del sistema.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/panel-incidentes
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
