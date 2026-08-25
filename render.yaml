@@ -1,0 +1,16 @@
+# Render: un servicio web con disco persistente.
+services:
+  - type: web
+    name: panel-incidentes-smt
+    runtime: docker
+    plan: starter          # el plan free NO admite discos persistentes
+    healthCheckPath: /api/health
+    disk:
+      name: panel-datos
+      mountPath: /data     # coincide con DATA_DIR del Dockerfile
+      sizeGB: 1
+    envVars:
+      - key: UPLOAD_TOKEN
+        sync: false        # se carga a mano en el panel de Render
+      - key: DATA_DIR
+        value: /data

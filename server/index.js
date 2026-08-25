@@ -12,16 +12,47 @@ const R = require("./excelReader");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
-const DATA_DIR = path.join(__dirname, "data");
+const HOST = process.env.HOST || "0.0.0.0"; // en contenedor hay que escuchar en todas
 
-// En serverless (Vercel) el cwd y el __dirname no siempre coinciden con el
-// layout local, así que se prueban varias ubicaciones antes de rendirse.
+// DATA_DIR es el directorio de trabajo: en el host se monta ahí el disco
+// persistente, para que la carga mensual sobreviva a los redespliegues.
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
+
+// SEED_DIR viaja dentro de la imagen y NUNCA se escribe. Si el volumen arranca
+// vacío (primer despliegue, disco nuevo) se copia desde acá: montar un volumen
+// sobre data/ taparía los archivos incluidos en la imagen y el tablero
+// arrancaría sin datos.
+const SEED_DIR = process.env.SEED_DIR || path.join(__dirname, "seed");
+
+function sembrarSiFalta() {
+  if (!fs.existsSync(SEED_DIR)) return;
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  for (const archivo of fs.readdirSync(SEED_DIR)) {
+    const destino = path.join(DATA_DIR, archivo);
+    if (fs.existsSync(destino)) continue;
+    fs.copyFileSync(path.join(SEED_DIR, archivo), destino);
+    console.log(`[seed] ${archivo} copiado a ${DATA_DIR}`);
+  }
+}
+
+// En serverless (Vercel) el disco es de solo lectura: no se puede sembrar.
+if (!process.env.VERCEL) {
+  try {
+    sembrarSiFalta();
+  } catch (err) {
+    console.error("[seed] No se pudo sembrar el directorio de datos:", err.message);
+  }
+}
+
+// En serverless el cwd y el __dirname no siempre coinciden con el layout local,
+// así que se prueban varias ubicaciones antes de rendirse.
 function resolveExcelPath() {
   if (process.env.EXCEL_PATH) return process.env.EXCEL_PATH;
   const candidatos = [
     path.join(DATA_DIR, "incidentes.xlsx"),
+    path.join(SEED_DIR, "incidentes.xlsx"),
+    path.join(process.cwd(), "server", "seed", "incidentes.xlsx"),
     path.join(process.cwd(), "server", "data", "incidentes.xlsx"),
-    path.join(process.cwd(), "data", "incidentes.xlsx"),
   ];
   return candidatos.find((p) => fs.existsSync(p)) || candidatos[0];
 }
@@ -41,7 +72,11 @@ let state = { records: [], meta: {}, loadedAt: null, error: null };
 // clasificación ya calculada en Excel. Si falta, el resto del tablero sigue
 // funcionando y solo esa vista avisa del problema.
 const SINIESTRALIDAD_PATH =
-  process.env.SINIESTRALIDAD_PATH || path.join(DATA_DIR, "siniestralidad.xlsx");
+  process.env.SINIESTRALIDAD_PATH ||
+  [path.join(DATA_DIR, "siniestralidad.xlsx"), path.join(SEED_DIR, "siniestralidad.xlsx")].find(
+    (p) => fs.existsSync(p)
+  ) ||
+  path.join(DATA_DIR, "siniestralidad.xlsx");
 
 let recurrencia = { puntos: [], meta: {}, loadedAt: null, error: null };
 let indicadoresSV = { datos: null, loadedAt: null, error: null };
@@ -270,10 +305,31 @@ app.post("/api/reload", requireUploadToken, (req, res) => {
   res.json({ ok: !state.error, error: state.error, totalRegistros: state.records.length });
 });
 
+// --- Frontend ---
+// En el host esto corre como UN solo servicio: el mismo Express sirve la API y
+// el build del cliente. En Vercel no hace falta (los estáticos los sirve la
+// plataforma) y en desarrollo tampoco, porque Vite hace de proxy.
+const CLIENT_DIST = process.env.CLIENT_DIST || path.join(__dirname, "..", "client", "dist");
+
+if (fs.existsSync(CLIENT_DIST)) {
+  app.use(express.static(CLIENT_DIST));
+
+  // Fallback del SPA: /analisis, /datos y demás rutas las resuelve React Router
+  // en el navegador, así que cualquier GET que no sea /api ni un archivo real
+  // devuelve el index.html. Sin esto, recargar en esas rutas da 404.
+  app.get(/^\/(?!api\/).*/, (req, res, next) => {
+    if (req.method !== "GET") return next();
+    res.sendFile(path.join(CLIENT_DIST, "index.html"));
+  });
+  console.log(`[web] sirviendo el cliente desde ${CLIENT_DIST}`);
+} else {
+  console.log("[web] sin build del cliente: solo API (usá Vite en desarrollo)");
+}
+
 // Solo levanta el puerto si se ejecuta directamente (npm start). En Vercel el
 // módulo se importa desde api/[...path].js y la app se usa como handler.
 if (require.main === module) {
-  app.listen(PORT, () => {
+  app.listen(PORT, HOST, () => {
     console.log(`\n  Dashboard API en http://localhost:${PORT}`);
     console.log(`  Excel esperado en: ${EXCEL_PATH}\n`);
   });

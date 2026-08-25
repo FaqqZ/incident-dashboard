@@ -1,0 +1,21 @@
+# Para un VPS propio o cualquier host que corra docker compose.
+#   docker compose up -d --build
+
+services:
+  panel:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      # Clave de la gestión de datos. SIN esto, /api/upload y /api/limpiar
+      # quedan abiertos a cualquiera que llegue a la URL.
+      UPLOAD_TOKEN: ${UPLOAD_TOKEN:?definí UPLOAD_TOKEN en un archivo .env}
+      DATA_DIR: /data
+    volumes:
+      # El disco persistente: acá viven los Excel y los respaldos, y sobreviven
+      # a cada redespliegue.
+      - panel-datos:/data
+
+volumes:
+  panel-datos:
