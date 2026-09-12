@@ -132,11 +132,12 @@ function reload() {
 reload();
 
 function getFilters(req) {
-  const { from, to, categoria, turno, mes, clase, naturaleza } = req.query;
+  const { from, to, categoria, subcategoria, turno, mes, clase, naturaleza } = req.query;
   return {
     from: from || null,
     to: to || null,
     categoria: categoria || null,
+    subcategoria: subcategoria || null,
     turno: turno || null,
     mes: mes || null,
     clase: clase || null,
@@ -191,6 +192,9 @@ app.get("/api/dashboard", (req, res) => {
     kpis,
     categoriaPrincipal: kpis.categoriaTop ? kpis.categoriaTop.name : null,
     porCategoria: R.countBy(f, "categoria"),
+    // Desglose dentro de la categoría. Es el corte que abre "TRÁNSITO.",
+    // que por sí sola concentra la mayor parte de los reportes.
+    porSubcategoria: R.countBy(f, "subcategoria"),
     porTurno: R.countBy(f, "turno"),
     porMes: R.porMes(f),
     rankingPuntos: R.rankingPuntos(f, 12),

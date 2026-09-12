@@ -197,7 +197,11 @@ export default function RecurrenciaMap({ puntos, etiquetas }) {
         <MapContainer center={CENTRO} zoom={ZOOM} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            // CARTO pasó a exigir clave: sus tiles seguían devolviendo 200 pero
+            // con una imagen que dice "API KEY REQUIRED" estampada sobre el mapa.
+            // OpenStreetMap no la pide y alcanza de sobra para esta escala.
+            url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+            maxZoom={19}
           />
           <AjustarVista puntos={ubicables} />
           <Redimensionar />

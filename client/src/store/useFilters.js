@@ -4,12 +4,22 @@
 
 import { create } from "zustand";
 
-const EMPTY = { from: "", to: "", categoria: "", turno: "", mes: "", clase: "", naturaleza: "" };
+const EMPTY = {
+  from: "", to: "", categoria: "", subcategoria: "", turno: "", mes: "", clase: "", naturaleza: "",
+};
 
 export const useFilters = create((set, get) => ({
   filters: { ...EMPTY },
   setFilter: (key, value) =>
-    set((s) => ({ filters: { ...s.filters, [key]: value } })),
+    set((s) => ({
+      filters: {
+        ...s.filters,
+        [key]: value,
+        // Cambiar de categoría invalida la subcategoría elegida: pertenece a
+        // la anterior y dejarla puesta daría cero resultados sin explicación.
+        ...(key === "categoria" ? { subcategoria: "" } : {}),
+      },
+    })),
   toggleFilter: (key, value) =>
     set((s) => ({
       filters: { ...s.filters, [key]: s.filters[key] === value ? "" : value },

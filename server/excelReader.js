@@ -290,11 +290,15 @@ function loadIncidents(filePath, opts = {}) {
 // ---------------------------------------------------------------------------
 // Filtros
 // ---------------------------------------------------------------------------
-function applyFilters(records, { from, to, categoria, turno, mes, clase, naturaleza } = {}) {
+function applyFilters(
+  records,
+  { from, to, categoria, subcategoria, turno, mes, clase, naturaleza } = {}
+) {
   return records.filter((r) => {
     if (from && (!r.fecha || r.fecha < from)) return false;
     if (to && (!r.fecha || r.fecha > to)) return false;
     if (categoria && r.categoria !== categoria) return false;
+    if (subcategoria && r.subcategoria !== subcategoria) return false;
     if (turno && r.turno !== turno) return false;
     if (mes && r.mes !== mes) return false;
     if (clase && r.clase !== clase) return false;
@@ -739,8 +743,23 @@ function buildFilterOptions(records) {
     .sort((a, b) => a[1] - b[1])
     .map(([name]) => name);
 
+  // Subcategorías agrupadas por categoría: son 85 en total, así que el selector
+  // muestra solo las de la categoría elegida en vez de una lista inmanejable.
+  const subPorCategoria = {};
+  records.forEach((r) => {
+    if (!r.subcategoria) return;
+    (subPorCategoria[r.categoria] ||= new Set()).add(r.subcategoria);
+  });
+  Object.keys(subPorCategoria).forEach((c) => {
+    subPorCategoria[c] = Array.from(subPorCategoria[c]).sort();
+  });
+
   return {
     categorias: Array.from(new Set(records.map((r) => r.categoria))).sort(),
+    subcategorias: Array.from(
+      new Set(records.map((r) => r.subcategoria).filter(Boolean))
+    ).sort(),
+    subcategoriasPorCategoria: subPorCategoria,
     turnos: Array.from(new Set(records.map((r) => r.turno))).sort(),
     naturalezas: Array.from(new Set(records.map((r) => r.naturaleza))).sort(),
     meses, // ya ordenados ene->dic

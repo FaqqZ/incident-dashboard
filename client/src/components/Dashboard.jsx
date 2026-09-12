@@ -9,6 +9,7 @@ import { useDataVersion } from "../store/useDataVersion";
 import FiltersBar from "./FiltersBar";
 import KpiCard from "./KpiCard";
 import CategoryBarChart from "./CategoryBarChart";
+import SubcategoryBarChart from "./SubcategoryBarChart";
 import RankingChart from "./RankingChart";
 import TrendLineChart from "./TrendLineChart";
 import RecurrenciaMap, { ETIQUETAS_GENERICAS } from "./RecurrenciaMap";
@@ -149,6 +150,17 @@ export default function Dashboard() {
                   <h3>Incidentes por categoría</h3>
                   <p className="panel-sub">Tocá una barra para filtrar todo el tablero</p>
                   <CategoryBarChart data={data.porCategoria} />
+                </div>
+
+                <div className="panel panel-wide">
+                  <h3>Incidentes por subcategoría</h3>
+                  <p className="panel-sub">
+                    {filters.categoria
+                      ? `Desglose dentro de ${filters.categoria}`
+                      : "Desglose fino de todas las categorías"}
+                    {" · tocá una barra para filtrar todo el tablero"}
+                  </p>
+                  <SubcategoryBarChart data={data.porSubcategoria} />
                 </div>
 
                 <div className="panel panel-wide">

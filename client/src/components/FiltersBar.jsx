@@ -5,7 +5,16 @@ import { useFilters } from "../store/useFilters";
 
 export default function FiltersBar({ options }) {
   const { filters, setFilter, reset, hasActiveFilters } = useFilters();
-  const { categorias = [], meses = [], naturalezas = [], rangoFechas = {} } = options || {};
+  const {
+    categorias = [], meses = [], naturalezas = [], rangoFechas = {},
+    subcategorias = [], subcategoriasPorCategoria = {},
+  } = options || {};
+
+  // Son 85 subcategorías en total: con una categoría elegida se muestran solo
+  // las suyas, que es la lista con la que se puede trabajar de verdad.
+  const subcategoriasVisibles = filters.categoria
+    ? subcategoriasPorCategoria[filters.categoria] || []
+    : subcategorias;
 
   return (
     <div className="filters" id="filtros-bar">
@@ -22,6 +31,15 @@ export default function FiltersBar({ options }) {
         <select id="f-cat" value={filters.categoria} onChange={(e) => setFilter("categoria", e.target.value)}>
           <option value="">Todas</option>
           {categorias.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+
+      <div className="field">
+        <label htmlFor="f-subcat">Subcategoría</label>
+        <select id="f-subcat" value={filters.subcategoria}
+          onChange={(e) => setFilter("subcategoria", e.target.value)}>
+          <option value="">Todas</option>
+          {subcategoriasVisibles.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
 
