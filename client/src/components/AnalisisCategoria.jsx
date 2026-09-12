@@ -63,10 +63,10 @@ export default function AnalisisCategoria() {
           <h1>Análisis por categoría</h1>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <Link to="/siniestros-viales" className="btn" style={{ fontSize: "12px" }}>
+          <Link to="/comm/siniestros-viales" className="btn" style={{ fontSize: "12px" }}>
             Siniestros viales
           </Link>
-          <Link to="/" className="btn">Volver al tablero</Link>
+          <Link to="/comm" className="btn">Volver al tablero</Link>
         </div>
       </header>
 

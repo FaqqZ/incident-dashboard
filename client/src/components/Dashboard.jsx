@@ -60,13 +60,14 @@ export default function Dashboard() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {data && <span className="updated">{nf(data.totalFiltrado)} incidentes en vista</span>}
-          <Link to="/analisis" className="btn" style={{ fontSize: "12px" }}>
+          <Link to="/" className="btn" style={{ fontSize: "12px" }}>Áreas</Link>
+          <Link to="/comm/analisis" className="btn" style={{ fontSize: "12px" }}>
             Análisis por categoría
           </Link>
-          <Link to="/siniestros-viales" className="btn" style={{ fontSize: "12px" }}>
+          <Link to="/comm/siniestros-viales" className="btn" style={{ fontSize: "12px" }}>
             Siniestros viales
           </Link>
-          <Link to="/datos" className="btn" style={{ fontSize: "12px" }}>Gestión de datos</Link>
+          <Link to="/comm/datos" className="btn" style={{ fontSize: "12px" }}>Gestión de datos</Link>
           <ExportButton />
         </div>
       </header>
@@ -76,8 +77,8 @@ export default function Dashboard() {
 
         {error && (
           <div className="banner-error">
-            No se pudieron cargar los datos: {error}. Revisá que el servidor esté corriendo y
-            que el Excel tenga las hojas <b>bd</b> y <b>coordenadas-cam-actualizado</b>.
+            No se pudieron cargar los datos: {error}. Revisá que el servidor esté corriendo
+            y que el Excel tenga la hoja de incidentes y la de coordenadas de cámaras.
           </div>
         )}
 
@@ -136,7 +137,11 @@ export default function Dashboard() {
               <section className="charts-section">
                 <div className="panel panel-wide">
                   <h3>Evolución mensual</h3>
-                  <p className="panel-sub">Incidentes por mes (enero → julio)</p>
+                  <p className="panel-sub">
+                    Incidentes por mes{data.porMes?.length
+                      ? ` (${data.porMes[0].name} → ${data.porMes[data.porMes.length - 1].name})`
+                      : ""}
+                  </p>
                   <TrendLineChart data={data.porMes} />
                 </div>
 

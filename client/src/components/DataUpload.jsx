@@ -257,7 +257,7 @@ export default function DataUpload() {
     return (
       <div className="app">
         <Topbar>
-          <Link to="/" className="btn">Volver al dashboard</Link>
+          <Link to="/comm" className="btn">Volver al dashboard</Link>
         </Topbar>
         <main className="canvas">
           <div className="state">
@@ -273,7 +273,7 @@ export default function DataUpload() {
     return (
       <div className="app">
         <Topbar>
-          <Link to="/" className="btn">Volver al dashboard</Link>
+          <Link to="/comm" className="btn">Volver al dashboard</Link>
         </Topbar>
 
         <main className="canvas">
@@ -307,7 +307,7 @@ export default function DataUpload() {
         {cargaHabilitada && (
           <button onClick={handleLogout} className="btn">Cerrar sesión</button>
         )}
-        <Link to="/" className="btn primary">Volver al dashboard</Link>
+        <Link to="/comm" className="btn primary">Volver al dashboard</Link>
       </Topbar>
 
       <main className="canvas">

@@ -9,6 +9,7 @@ const fs = require("fs");
 require("dotenv").config();
 
 const R = require("./excelReader");
+const { listarAreas } = require("./areas");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -144,6 +145,23 @@ function getFilters(req) {
 }
 
 // Salud + diagnóstico del mapeo de columnas y del cruce
+// Áreas de la Subsecretaría. La pantalla de inicio arma el selector con esto y
+// marca cuáles tienen datos cargados y cuáles siguen pendientes.
+app.get("/api/areas", (req, res) => {
+  const areas = listarAreas(DATA_DIR).map((a) =>
+    a.id === "comm"
+      ? {
+          ...a,
+          // El COMM es el único con pipeline armado: se informa su estado real.
+          registros: state.records.length,
+          error: state.error,
+          listo: !state.error && state.records.length > 0,
+        }
+      : { ...a, registros: null, error: null, listo: false }
+  );
+  res.json({ areas });
+});
+
 app.get("/api/health", (req, res) => {
   res.json({
     ok: !state.error,

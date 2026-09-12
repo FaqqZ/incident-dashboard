@@ -1231,3 +1231,98 @@
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+/* --- Pantalla de inicio: selector de área (caso de estudio) --- */
+.portada {
+  margin: 8px 0 24px;
+}
+
+.portada h2 {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+}
+
+.portada p {
+  font-size: 14.5px;
+  color: var(--ink-2);
+  margin: 0;
+  max-width: 640px;
+}
+
+.areas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 18px;
+}
+
+.area-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 5px solid var(--color-3);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+a.area-card:hover {
+  border-color: var(--color-4);
+  border-left-color: var(--color-1);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+/* Un área sin datos no se puede abrir: se muestra apagada y sin cursor de
+   enlace, para que quede claro antes de hacer clic. */
+.area-card.deshabilitada {
+  opacity: 0.62;
+  border-left-color: var(--ink-3);
+  cursor: not-allowed;
+}
+
+.area-sigla {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+}
+
+.area-card h3 {
+  font-size: 19px;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.area-card p {
+  font-size: 13.5px;
+  color: var(--ink-2);
+  margin: 0;
+  flex: 1;
+}
+
+.area-estado {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.area-estado.ok { color: var(--ok-ink); }
+.area-estado.pendiente { color: var(--ink-3); }
+
+.area-cta {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-4);
+  margin-top: 4px;
+}
+
+.area-card.deshabilitada .area-cta {
+  color: var(--ink-3);
+}

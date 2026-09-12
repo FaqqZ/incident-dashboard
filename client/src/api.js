@@ -63,3 +63,10 @@ export async function fetchAnalisisCategoria(categoria) {
   }
   return res.json();
 }
+
+// --- Áreas (casos de estudio) de la Subsecretaría ---
+export async function fetchAreas() {
+  const res = await fetch("/api/areas");
+  if (!res.ok) throw new Error(`Error ${res.status} al cargar las áreas`);
+  return res.json();
+}

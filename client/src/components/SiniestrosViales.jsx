@@ -23,7 +23,7 @@ export default function SiniestrosViales() {
           <span className="brand-divider" aria-hidden="true" />
           <h1>Siniestros viales detectados por el COMM</h1>
         </div>
-        <Link to="/" className="btn">Volver al tablero</Link>
+        <Link to="/comm" className="btn">Volver al tablero</Link>
       </header>
 
       <main className="canvas vista-siniestros">

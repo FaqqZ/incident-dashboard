@@ -188,20 +188,37 @@ function loadIncidents(filePath, opts = {}) {
   }
   const wb = XLSX.readFile(filePath, { cellDates: true });
 
+  // Los nombres de hoja cambian entre versiones del Excel del COMM: la base de
+  // incidentes fue "bd" y hoy es "Base-EaJ"; la de cámaras fue
+  // "coordenadas-cam-actualizado", después "Coordendas-Cámaras" (sic, sin la
+  // "e") y hoy "Coordenadas". Por eso se detectan por coincidencia y con varios
+  // alias, en vez de por nombre fijo.
+  //
+  // OJO con el orden: el libro nuevo trae además "Base Analítica", que también
+  // contiene "base". Los alias más específicos van primero.
   const bdSheet =
     opts.bdSheet ||
-    findSheetName(wb, { exact: ["bd"], contains: ["bd", "incident", "base"] });
+    findSheetName(wb, {
+      exact: ["bd", "Base-EaJ"],
+      contains: ["base-ea", "bd", "incident", "base"],
+    });
   const camSheet =
     opts.camSheet ||
     findSheetName(wb, {
-      contains: ["actualizado", "coordenadas-cam-actualizado", "camaras", "cámaras"],
+      exact: ["Coordenadas"],
+      contains: ["coordenadas", "coordendas", "actualizado", "camaras", "cámaras"],
     });
 
-  if (!bdSheet) throw new Error('No se encontró la hoja de incidentes ("bd").');
-  if (!camSheet)
+  if (!bdSheet) {
     throw new Error(
-      'No se encontró la hoja de cámaras (se busca la que contiene "actualizado").'
+      `No se encontró la hoja de incidentes. Hojas del archivo: ${wb.SheetNames.join(", ")}`
     );
+  }
+  if (!camSheet) {
+    throw new Error(
+      `No se encontró la hoja de cámaras. Hojas del archivo: ${wb.SheetNames.join(", ")}`
+    );
+  }
 
   const cameras = loadCameras(wb, camSheet);
 
