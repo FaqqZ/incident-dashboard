@@ -2,7 +2,7 @@
 // siniestros viales detectados por el COMM (ruta "/siniestros-viales").
 //
 // Va separada del tablero general a propósito: tiene otra fuente
-// (siniestralidad.xlsx), otro período —acumulado enero–julio 2026, fijo— y una
+// (siniestralidad.xlsx), otro período —el acumulado que traiga la planilla, fijo— y una
 // clasificación precalculada en Excel. Mezclarla con las demás categorías, que
 // responden a los filtros generales, confundía las dos lecturas.
 

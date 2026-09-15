@@ -52,7 +52,7 @@ export default function RecurrenciaPanel() {
     <section className="panel panel-wide" style={{ marginBottom: 20 }}>
       <h3>Recurrencia territorial de siniestros viales detectados por el COMM</h3>
       <p className="panel-sub">
-        {data?.periodo || "Acumulado enero–julio de 2026"} · el color indica la recurrencia
+        {data?.periodo || "Acumulado del período de la planilla"} · el color indica la recurrencia
         relativa del punto, no un nivel de riesgo vial
       </p>
 

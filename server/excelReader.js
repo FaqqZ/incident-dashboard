@@ -408,7 +408,8 @@ function buildMapPoints(records) {
 // ---------------------------------------------------------------------------
 // RECURRENCIA TERRITORIAL DE SINIESTROS VIALES (COMM)
 // ---------------------------------------------------------------------------
-// Fuente: hoja "Hoja2" de "COM indicadores de siniestralidad...". Una fila por
+// Fuente: hoja de recurrencia de "COM indicadores de siniestralidad..." — se
+// llamaba "Hoja2" y desde la planilla de agosto se llama "SV pers+recurr". Una fila por
 // dispositivo donde se detectó al menos un siniestro vial en el período.
 //
 // IMPORTANTE: la clasificación (percentiles P75/P90/P95, clase, color y
@@ -424,9 +425,18 @@ function loadRecurrencia(filePath, cameras) {
     throw new Error(`No se encontró el Excel de siniestralidad en: ${filePath}`);
   }
   const wb = XLSX.readFile(filePath);
-  const hoja =
-    findSheetName(wb, { exact: ["Hoja2"], contains: ["hoja2", "siniestr", "recurrenc"] }) ||
-    wb.SheetNames[0];
+  // Sin fallback a la primera hoja: la planilla de agosto renombró "Hoja2" y el
+  // fallback caía en "BD original", que devolvía 44.395 "puntos" todos grises
+  // sin ningún error. Mejor que la vista avise que la hoja no está.
+  const hoja = findSheetName(wb, {
+    exact: ["SV pers+recurr", "Hoja2"],
+    contains: ["pers+recurr", "recurr", "hoja2"],
+  });
+  if (!hoja) {
+    throw new Error(
+      `No se encontró la hoja de recurrencia ("SV pers+recurr"). Hojas del archivo: ${wb.SheetNames.join(", ")}`
+    );
+  }
 
   const rawRows = XLSX.utils.sheet_to_json(wb.Sheets[hoja], { defval: "" });
   const headers = rawRows.length ? Object.keys(rawRows[0]) : [];
@@ -772,12 +782,13 @@ function buildFilterOptions(records) {
 }
 
 // ---------------------------------------------------------------------------
-// Indicadores del dashboard de siniestralidad vial (hoja "Hoja1" del Excel del
-// COMM: una fila por siniestro detectado).
+// Indicadores del dashboard de siniestralidad vial (hoja "BD filtrada" del Excel
+// del COMM —antes "Hoja1"—: una fila por siniestro detectado).
 //
 // Todo se calcula acá, pero los números están verificados contra el dashboard
-// que el COMM ya armó en Excel: 498 detectados, 2,35 diarios, -11,34% de
-// variación, 50,6% con lesiones, y las mismas franjas horarias.
+// que el COMM ya armó en Excel. Planilla de enero–agosto 2026: 585 detectados,
+// 2,41 diarios, +1,16% de variación, 48,9% con lesiones (286) y 264 registros
+// con hora válida — los mismos controles que trae "Tablas auxiliares".
 // ---------------------------------------------------------------------------
 
 const DIAS_SEMANA = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
@@ -803,7 +814,7 @@ function loadIndicadoresSV(filePath, anio = 2026) {
     throw new Error(`No se encontró el Excel de siniestralidad en: ${filePath}`);
   }
   const wb = XLSX.readFile(filePath);
-  const hoja = findSheetName(wb, { exact: ["Hoja1"], contains: ["hoja1"] });
+  const hoja = findSheetName(wb, { exact: ["BD filtrada", "Hoja1"], contains: ["filtrada", "hoja1"] });
   if (!hoja) return null; // el Excel viejo solo traía Hoja2: la vista degrada sin romperse
 
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[hoja], { defval: "" });
@@ -828,15 +839,15 @@ function loadIndicadoresSV(filePath, anio = 2026) {
     .filter((m) => acumMes.has(m.name));
 
   // Días del período: se suman los meses efectivamente presentes, que es como
-  // el COMM calcula el promedio diario (498 / 212 = 2,35).
+  // el COMM calcula el promedio diario (585 / 243 = 2,41).
   const diasPeriodo = porMesSV.reduce((acc, m) => {
     const d = DIAS_POR_MES[m.mesnro - 1];
     return acc + (m.mesnro === 2 && esBisiesto(anio) ? d + 1 : d);
   }, 0);
 
   // --- Promedio por día de la semana ---
-  // Divide por cuántas veces cayó ese día en el período, no por 7: enero-julio
-  // 2026 tiene 31 jueves y viernes pero 30 del resto, y eso mueve el promedio.
+  // Divide por cuántas veces cayó ese día en el período, no por 7: no todos
+  // los días de la semana caen la misma cantidad de veces, y eso mueve el promedio.
   const vecesPorDia = Object.fromEntries(DIAS_SEMANA.map((d) => [d, 0]));
   if (porMesSV.length) {
     const desde = new Date(anio, porMesSV[0].mesnro - 1, 1);

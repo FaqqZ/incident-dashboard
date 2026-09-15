@@ -356,7 +356,14 @@ app.get("/api/recurrencia", (req, res) => {
     puntos: filtrados,
     resumen: R.resumenRecurrencia(filtrados),
     totalSinFiltrar: recurrencia.puntos.length,
-    periodo: "Acumulado enero–julio de 2026",
+    // El período sale de los meses que trae la planilla, no de un texto fijo:
+    // decía "enero–julio" y quedó viejo en cuanto llegó la planilla de agosto.
+    periodo: (() => {
+      const meses = indicadoresSV.datos?.porMes || [];
+      if (!meses.length) return "Acumulado del período de la planilla";
+      const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+      return `Acumulado ${cap(meses[0].name)}–${meses[meses.length - 1].name} de ${indicadoresSV.datos.meta.anio}`;
+    })(),
     meta: recurrencia.meta,
     loadedAt: recurrencia.loadedAt,
   });

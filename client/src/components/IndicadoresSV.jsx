@@ -1,9 +1,9 @@
 // IndicadoresSV.jsx — indicadores descriptivos de siniestralidad vial.
-// Replica el dashboard que el COMM ya tiene en Excel (hoja "Dashboard"), con
-// los mismos números: 498 detectados, 2,35 diarios, -11,34%, 50,6% con lesiones.
+// Replica el dashboard que el COMM ya tiene en Excel (hoja "Dashboard").
 //
-// Son del período completo enero–julio 2026 y NO responden a los filtros del
-// mapa: el Excel los calcula sobre el acumulado.
+// Son del período completo que trae la planilla y NO responden a los filtros
+// del mapa: el Excel los calcula sobre el acumulado. El período se arma con los
+// meses presentes en los datos — antes decía "enero–julio" fijo.
 
 import { useEffect, useState } from "react";
 import {
@@ -48,6 +48,9 @@ export default function IndicadoresSV() {
   const { kpis: k } = data;
   const variacion = k.variacionUltimoMes;
   const ultimoMes = data.porMes[data.porMes.length - 1]?.name;
+  const periodo = data.porMes.length
+    ? `${cap(data.porMes[0].name)}–${data.porMes[data.porMes.length - 1].name} ${data.meta.anio}`
+    : "";
 
   // Índices del valor más alto de cada serie: ese va en amarillo.
   const idxMes = indiceMaximo(data.porMes);
@@ -72,7 +75,7 @@ export default function IndicadoresSV() {
       <section className="charts-section" style={{ marginBottom: 20 }}>
         <div className="panel panel-wide">
           <h3>Evolución mensual de siniestros viales detectados</h3>
-          <p className="panel-sub">Enero–julio 2026</p>
+          <p className="panel-sub">{periodo}</p>
           <ResponsiveContainer width="100%" height={280}>
             <AreaChart data={data.porMes.map((m) => ({ ...m, label: cap(m.name) }))}
               margin={{ left: -18, right: 30, top: 24 }}>
@@ -99,7 +102,7 @@ export default function IndicadoresSV() {
         <div className="charts-grid">
           <div className="panel">
             <h3>Promedio de siniestros por día de la semana</h3>
-            <p className="panel-sub">Acumulado enero–julio 2026</p>
+            <p className="panel-sub">Acumulado {periodo}</p>
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={data.porDiaSemana.map((d) => ({ ...d, label: cap(d.name) }))}
                 margin={{ left: -20, right: 12, top: 22 }}>
