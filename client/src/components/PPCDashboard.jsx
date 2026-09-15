@@ -20,7 +20,9 @@ const nf = (n, d = 0) =>
   (n ?? 0).toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
-const SIN_FILTROS = { tipo: "", mesDesde: "", mesHasta: "" };
+// Un solo mes, no un rango: elegir "enero" tiene que mostrar el total de enero.
+// Con Desde/Hasta, elegir solo "Desde: enero" mostraba el acumulado del año.
+const SIN_FILTROS = { tipo: "", mes: "" };
 
 export default function PPCDashboard() {
   const [filtros, setFiltros] = useState(SIN_FILTROS);
@@ -35,7 +37,8 @@ export default function PPCDashboard() {
 
   useEffect(() => {
     setLoading(true);
-    fetchPPC(filtros)
+    // La API trabaja con rango: un mes es el rango que empieza y termina en él.
+    fetchPPC({ tipo: filtros.tipo, mesDesde: filtros.mes, mesHasta: filtros.mes })
       .then((d) => { setData(d); setError(null); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -45,7 +48,7 @@ export default function PPCDashboard() {
   // Click en una barra o en un mini gráfico: elige el tipo, o lo suelta si ya
   // estaba elegido.
   const alternarTipo = (t) => setFiltros((f) => ({ ...f, tipo: f.tipo === t ? "" : t }));
-  const hayFiltros = Boolean(filtros.tipo || filtros.mesDesde || filtros.mesHasta);
+  const hayFiltros = Boolean(filtros.tipo || filtros.mes);
 
   const k = data?.kpis;
   const meses = opciones?.meses || [];
@@ -69,19 +72,9 @@ export default function PPCDashboard() {
           </div>
 
           <div className="field">
-            <label htmlFor="ppc-desde">Desde</label>
-            <select id="ppc-desde" value={filtros.mesDesde}
-              onChange={(e) => set("mesDesde", e.target.value)}>
-              <option value="">Primer mes</option>
-              {meses.map((m) => <option key={m} value={m}>{cap(m)}</option>)}
-            </select>
-          </div>
-
-          <div className="field">
-            <label htmlFor="ppc-hasta">Hasta</label>
-            <select id="ppc-hasta" value={filtros.mesHasta}
-              onChange={(e) => set("mesHasta", e.target.value)}>
-              <option value="">Último mes</option>
+            <label htmlFor="ppc-mes">Mes</label>
+            <select id="ppc-mes" value={filtros.mes} onChange={(e) => set("mes", e.target.value)}>
+              <option value="">Todos</option>
               {meses.map((m) => <option key={m} value={m}>{cap(m)}</option>)}
             </select>
           </div>
@@ -118,17 +111,29 @@ export default function PPCDashboard() {
 
               <section className="kpi-grid">
                 <KpiCard label="Intervenciones" value={nf(k.total)}
-                  hint={filtros.tipo ? `${filtros.tipo} · ${k.mesesObservados} meses` : `${k.mesesObservados} meses en vista`}
+                  hint={[filtros.tipo, filtros.mes ? cap(filtros.mes) : `${k.mesesObservados} meses en vista`]
+                    .filter(Boolean).join(" · ")}
                   accent="var(--c1)" />
-                <KpiCard label="Promedio mensual" value={nf(k.promedioMensual)}
-                  hint={`${nf(k.promedioDiario, 1)} por día · ${nf(k.dias)} días`}
-                  accent="var(--c2)" />
+                {/* Con un mes elegido el promedio mensual repetiría el total:
+                    ahí sirve el diario. */}
+                {filtros.mes ? (
+                  <KpiCard label="Promedio diario" value={nf(k.promedioDiario, 1)}
+                    hint={`Sobre ${nf(k.dias)} días de ${cap(filtros.mes)}`}
+                    accent="var(--c2)" />
+                ) : (
+                  <KpiCard label="Promedio mensual" value={nf(k.promedioMensual)}
+                    hint={`${nf(k.promedioDiario, 1)} por día · ${nf(k.dias)} días`}
+                    accent="var(--c2)" />
+                )}
                 <KpiCard label="Tipo predominante" value={k.tipoTop?.name || "—"}
                   hint={k.tipoTop ? `${nf(k.tipoTop.value)} · ${nf(k.tipoTop.pct, 1)}% del período` : ""}
                   accent="var(--c3)" />
-                <KpiCard label="Mes pico" value={cap(k.mesPico?.name) || "—"}
-                  hint={k.mesPico ? `${nf(k.mesPico.value)} intervenciones` : ""}
-                  accent="var(--c4)" />
+                {/* Con un mes elegido el "mes pico" sería ese mismo mes. */}
+                {!filtros.mes && (
+                  <KpiCard label="Mes pico" value={cap(k.mesPico?.name) || "—"}
+                    hint={k.mesPico ? `${nf(k.mesPico.value)} intervenciones` : ""}
+                    accent="var(--c4)" />
+                )}
                 {k.variacion && (
                   <KpiCard
                     label={`${cap(k.variacion.mes)} vs ${cap(k.variacion.contra)}`}
@@ -196,8 +201,15 @@ export default function PPCDashboard() {
                     Cada tipo con su propia escala: sirve para comparar la forma de cada
                     serie, no su altura. El mes pico va en amarillo
                   </p>
-                  <MiniSeries series={data.serieTipos} seleccionado={filtros.tipo}
-                    onSelect={alternarTipo} />
+                  {filtros.mes ? (
+                    <div className="state">
+                      Con un solo mes no hay evolución que mostrar. Elegí “Todos” en Mes para
+                      ver cómo se movió cada tipo.
+                    </div>
+                  ) : (
+                    <MiniSeries series={data.serieTipos} seleccionado={filtros.tipo}
+                      onSelect={alternarTipo} />
+                  )}
                 </div>
 
                 <div className="panel panel-wide">

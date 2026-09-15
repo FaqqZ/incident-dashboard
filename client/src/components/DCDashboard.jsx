@@ -26,7 +26,9 @@ const nf = (n, d = 0) =>
   (n ?? 0).toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
-const SIN_FILTROS = { dimension: "", valor: "", mesDesde: "", mesHasta: "" };
+// Un solo mes, no un rango: elegir "enero" tiene que mostrar el total de enero.
+// Con Desde/Hasta, elegir solo "Desde: enero" mostraba el acumulado del año.
+const SIN_FILTROS = { dimension: "", valor: "", mes: "" };
 
 export default function DCDashboard() {
   const [filtros, setFiltros] = useState(SIN_FILTROS);
@@ -41,7 +43,13 @@ export default function DCDashboard() {
 
   useEffect(() => {
     setLoading(true);
-    fetchDC(filtros)
+    // La API trabaja con rango: un mes es el rango que empieza y termina en él.
+    fetchDC({
+      dimension: filtros.dimension,
+      valor: filtros.valor,
+      mesDesde: filtros.mes,
+      mesHasta: filtros.mes,
+    })
       .then((d) => { setData(d); setError(null); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -62,7 +70,7 @@ export default function DCDashboard() {
     }));
 
   const setMes = (k, v) => setFiltros((f) => ({ ...f, [k]: v }));
-  const hayFiltros = Boolean(filtros.valor || filtros.mesDesde || filtros.mesHasta);
+  const hayFiltros = Boolean(filtros.valor || filtros.mes);
 
   const catSel = filtros.dimension === "categoria" ? filtros.valor : "";
   const orgSel = filtros.dimension === "organismo" ? filtros.valor : "";
@@ -98,19 +106,9 @@ export default function DCDashboard() {
           </div>
 
           <div className="field">
-            <label htmlFor="dc-desde">Desde</label>
-            <select id="dc-desde" value={filtros.mesDesde}
-              onChange={(e) => setMes("mesDesde", e.target.value)}>
-              <option value="">Primer mes</option>
-              {meses.map((x) => <option key={x} value={x}>{cap(x)}</option>)}
-            </select>
-          </div>
-
-          <div className="field">
-            <label htmlFor="dc-hasta">Hasta</label>
-            <select id="dc-hasta" value={filtros.mesHasta}
-              onChange={(e) => setMes("mesHasta", e.target.value)}>
-              <option value="">Último mes</option>
+            <label htmlFor="dc-mes">Mes</label>
+            <select id="dc-mes" value={filtros.mes} onChange={(e) => setMes("mes", e.target.value)}>
+              <option value="">Todos</option>
               {meses.map((x) => <option key={x} value={x}>{cap(x)}</option>)}
             </select>
           </div>
@@ -174,21 +172,38 @@ export default function DCDashboard() {
               )}
 
               <section className="kpi-grid">
+                {/* Con un mes elegido el período es ese mes ("Enero", no
+                    "Enero a Enero") y el promedio mensual repetiría el total. */}
                 <KpiCard label="Denuncias" value={nf(k.total)}
-                  hint={filtros.valor ? `${filtros.valor} · ${m.periodoEnVista}` : m.periodoEnVista}
+                  hint={[filtros.valor, filtros.mes ? cap(filtros.mes) : m.periodoEnVista]
+                    .filter(Boolean).join(" · ")}
                   accent="var(--c1)" />
-                <KpiCard label="Por mes" value={nf(k.promedioMensual)}
-                  hint={`Promedio de ${k.mesesObservados} meses`}
-                  accent="var(--c2)" />
-                <KpiCard label="Categoría top" value={k.categoriaTop?.name || "—"}
-                  hint={k.categoriaTop ? `${nf(k.categoriaTop.value)} denuncias` : ""}
+                {!filtros.mes && (
+                  <KpiCard label="Por mes" value={nf(k.promedioMensual)}
+                    hint={`Promedio de ${k.mesesObservados} meses`}
+                    accent="var(--c2)" />
+                )}
+                {/* La planilla no cruza categoría con organismo. Con una
+                    elegida, el "top" de la otra dimensión sería el del total
+                    general y se leería como si estuviera filtrado: se dice eso. */}
+                <KpiCard label="Categoría top"
+                  value={orgSel ? "—" : k.categoriaTop?.name || "—"}
+                  hint={orgSel
+                    ? "No se cruza con el organismo"
+                    : k.categoriaTop ? `${nf(k.categoriaTop.value)} denuncias` : ""}
                   accent="var(--c3)" />
-                <KpiCard label="Organismo top" value={k.organismoTop?.name || "—"}
-                  hint={k.organismoTop ? `${nf(k.organismoTop.value)} derivaciones` : ""}
+                <KpiCard label="Organismo top"
+                  value={catSel ? "—" : k.organismoTop?.name || "—"}
+                  hint={catSel
+                    ? "No se cruza con la categoría"
+                    : k.organismoTop ? `${nf(k.organismoTop.value)} derivaciones` : ""}
                   accent="var(--c4)" />
-                <KpiCard label="Mes pico" value={cap(k.mesPico?.name) || "—"}
-                  hint={k.mesPico ? `${nf(k.mesPico.value)} denuncias` : ""}
-                  accent="var(--c6)" />
+                {/* Con un mes elegido el "mes pico" sería ese mismo mes. */}
+                {!filtros.mes && (
+                  <KpiCard label="Mes pico" value={cap(k.mesPico?.name) || "—"}
+                    hint={k.mesPico ? `${nf(k.mesPico.value)} denuncias` : ""}
+                    accent="var(--c6)" />
+                )}
                 {k.variacion && (
                   <KpiCard
                     label="Último mes"
@@ -246,34 +261,60 @@ export default function DCDashboard() {
                     período —qué pasó y a quién se derivó— y conviene leerlas
                     juntas aunque la planilla no las deje cruzar. */}
                 <div className="charts-grid">
-                  <div className="panel">
+                  <div className={`panel${orgSel ? " panel-sin-cruce" : ""}`}>
                     <h3>Composición por categoría</h3>
                     <p className="panel-sub">
                       Qué parte del total se lleva cada tipo de denuncia · tocá una porción
                       para filtrar
                     </p>
+                    {orgSel && (
+                      <p className="nota-cruce">
+                        Muestra el total general: la planilla no dice qué categorías se
+                        derivaron a {orgSel}.
+                      </p>
+                    )}
                     <TortaDistribucion data={data.porCategoria} seleccionado={catSel}
                       onSelect={alternar("categoria")} etiqueta="Denuncias" tope={8} />
                   </div>
 
-                  <div className="panel">
+                  <div className={`panel${catSel ? " panel-sin-cruce" : ""}`}>
                     <h3>Composición por organismo</h3>
                     <p className="panel-sub">
                       A quién se derivó · elegir un organismo suelta la categoría, porque la
                       planilla no dice qué categoría fue a cuál
                     </p>
+                    {catSel && (
+                      <p className="nota-cruce">
+                        Muestra el total general: la planilla no dice a qué organismos se
+                        derivó {catSel}.
+                      </p>
+                    )}
                     <TortaDistribucion data={data.porOrganismo} seleccionado={orgSel}
                       onSelect={alternar("organismo")} etiqueta="Derivaciones" tope={8} />
                   </div>
                 </div>
 
-                <div className="panel panel-wide">
+                <div className={`panel panel-wide${orgSel ? " panel-sin-cruce" : ""}`}>
                   <h3>Evolución de la composición</h3>
                   <p className="panel-sub">
                     El borde de arriba es el total del mes y cada franja es lo que aportó cada
                     categoría · sirve para ver si la mezcla cambió, no solo el volumen
                   </p>
-                  <EvolucionApilada series={data.serieCategorias} tope={6} />
+                  {orgSel && (
+                    <p className="nota-cruce">
+                      Muestra todas las categorías: la planilla no permite abrirlas por
+                      organismo.
+                    </p>
+                  )}
+                  {filtros.mes ? (
+                    <div className="state">
+                      Con un solo mes no hay evolución que mostrar. Elegí “Todos” en Mes para
+                      ver cómo cambió la composición.
+                    </div>
+                  ) : (
+                    <EvolucionApilada series={data.serieCategorias} tope={6}
+                      seleccionado={catSel} />
+                  )}
                 </div>
               </section>
 

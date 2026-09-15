@@ -23,15 +23,21 @@ const PALETA = [
 ];
 const OTRAS = "var(--ink-3)";
 
-export default function EvolucionApilada({ series, tope = 6 }) {
+export default function EvolucionApilada({ series, tope = 6, seleccionado = "" }) {
   const ids = useIdsGrafico();
 
   if (!series || series.length === 0) {
     return <div className="state">Sin datos para el rango elegido.</div>;
   }
 
-  const visibles = series.slice(0, tope);
-  const cola = series.slice(tope);
+  // Si la categoría elegida quedó en la cola, se la saca de "Otras" y se dibuja
+  // aparte: si no, elegirla no cambiaría nada en este gráfico.
+  let visibles = series.slice(0, tope);
+  if (seleccionado && !visibles.some((s) => s.tipo === seleccionado)) {
+    const elegida = series.find((s) => s.tipo === seleccionado);
+    if (elegida) visibles = [...visibles, elegida];
+  }
+  const cola = series.filter((s) => !visibles.includes(s));
   const claveOtras = cola.length ? `Otras (${cola.length})` : null;
 
   // Los meses salen de la primera serie: todas traen los mismos puntos.
@@ -76,6 +82,10 @@ export default function EvolucionApilada({ series, tope = 6 }) {
             stroke={c.color}
             strokeWidth={1.5}
             fill={urlDe(`${ids.capa}-${i}`)}
+            // Con una categoría elegida, las demás franjas quedan atenuadas pero
+            // siguen apiladas: se ve cuánto aporta la elegida al total del mes.
+            fillOpacity={seleccionado && c.clave !== seleccionado ? 0.12 : 1}
+            strokeOpacity={seleccionado && c.clave !== seleccionado ? 0.3 : 1}
             isAnimationActive={false}
             activeDot={{ r: 4, stroke: "var(--surface)", strokeWidth: 1.5 }}
           />

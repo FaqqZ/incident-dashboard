@@ -1538,7 +1538,10 @@ a.area-card:hover {
 .area-logo {
   height: 58px;
   width: auto;
-  max-width: 72px;
+  /* 72 px alcanzaba para los escudos verticales (PPC, Defensa Civil), pero el
+     del COM es un logotipo apaisado (proporción 1,6): con ese tope quedaba más
+     bajo que los escudos. Con 100 px llega a la misma altura. */
+  max-width: 100px;
   object-fit: contain;
   display: block;
   flex-shrink: 0;
@@ -1967,4 +1970,29 @@ button.torta-fila:focus-visible {
    <defs> con id dinámico, que Recharts no deja pasar como prop del <Pie>. */
 .torta .recharts-pie {
   filter: drop-shadow(0 3px 9px rgba(4, 16, 31, 0.55));
+}
+
+/* Panel que la selección activa no puede filtrar. En Defensa Civil la planilla
+   no cruza categoría con organismo: con una elegida, el gráfico de la otra
+   dimensión sigue mostrando el total general. Se atenúa y dice por qué, en vez
+   de verse igual que antes y parecer que el filtro no hizo nada. Sigue siendo
+   clickeable: elegir ahí cambia de dimensión. */
+.panel-sin-cruce > :not(h3):not(.panel-sub):not(.nota-cruce) {
+  opacity: 0.38;
+  transition: opacity 0.2s;
+}
+
+.panel-sin-cruce:hover > :not(h3):not(.panel-sub):not(.nota-cruce) {
+  opacity: 0.7;
+}
+
+.nota-cruce {
+  margin: -4px 0 12px;
+  padding: 7px 11px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--warn-ink);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-sm);
 }

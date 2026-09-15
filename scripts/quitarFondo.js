@@ -9,12 +9,17 @@
 //
 // El fondo se saca con relleno por inundación DESDE LOS BORDES, no marcando
 // todo píxel oscuro: así un trazo oscuro dentro del escudo no se borra.
+//
+// Modo "negativo" (logo del COM): tinta negra sobre blanco. Ahí no alcanza con
+// quitar el fondo —el "COM" negro no se ve sobre el navy—, así que el blanco se
+// convierte en transparencia píxel a píxel y la tinta neutra pasa a blanco. Los
+// colores saturados (los arcos azul y dorado) conservan su tono.
 
 const fs = require("fs");
 const zlib = require("zlib");
 
 const [, , entrada, salida, modoArg, tolArg] = process.argv;
-const modo = modoArg || "negro"; // "negro" o "blanco"
+const modo = modoArg || "negro"; // "negro", "blanco" o "negativo"
 const tolerancia = Number(tolArg || 60);
 
 // --- decodificar -----------------------------------------------------------
@@ -80,6 +85,35 @@ for (let i = 0; i < ancho * alto; i++) {
   rgba[i * 4 + 3] = canales === 4 ? px[i * canales + 3] : 255;
 }
 
+// --- modo negativo --------------------------------------------------------
+// "Color a transparencia" contra blanco: el alfa es cuánto se aparta el píxel
+// del blanco, y el color se des-mezcla con ese alfa. Así los bordes suavizados
+// no dejan un halo claro. En modo negativo `tolerancia` es la saturación bajo
+// la cual un píxel se considera tinta neutra y pasa a blanco.
+if (modo === "negativo") {
+  const clamp = (v) => Math.max(0, Math.min(255, Math.round(v)));
+  for (let i = 0; i < ancho * alto; i++) {
+    const o = i * 4;
+    const r = rgba[o], g = rgba[o + 1], b = rgba[o + 2];
+    const alfaOriginal = rgba[o + 3] / 255;
+    let alfa = (255 - Math.min(r, g, b)) / 255;
+    if (alfa <= 0.02) { rgba[o + 3] = 0; continue; }
+    const saturado = Math.max(r, g, b) - Math.min(r, g, b) >= tolerancia;
+    // En los colores, el alfa se refuerza: si no, el brillo claro del centro
+    // del arco dorado quedaría casi transparente y se vería como un hueco.
+    if (saturado) alfa = Math.min(1, alfa * 2.5);
+    const desmezclar = (c) => clamp((c - 255 * (1 - alfa)) / alfa);
+    if (saturado) {
+      rgba[o] = desmezclar(r);
+      rgba[o + 1] = desmezclar(g);
+      rgba[o + 2] = desmezclar(b);
+    } else {
+      rgba[o] = rgba[o + 1] = rgba[o + 2] = 255; // tinta neutra → blanco
+    }
+    rgba[o + 3] = clamp(alfa * alfaOriginal * 255);
+  }
+}
+
 // --- inundación desde los bordes ------------------------------------------
 const esFondo = (i) => {
   const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2];
@@ -90,11 +124,14 @@ const esFondo = (i) => {
 
 const visto = new Uint8Array(ancho * alto);
 const cola = [];
-for (let x = 0; x < ancho; x++) {
-  cola.push(x, (alto - 1) * ancho + x);
-}
-for (let y = 0; y < alto; y++) {
-  cola.push(y * ancho, y * ancho + ancho - 1);
+// En modo negativo el fondo ya quedó transparente: no hay nada que inundar.
+if (modo !== "negativo") {
+  for (let x = 0; x < ancho; x++) {
+    cola.push(x, (alto - 1) * ancho + x);
+  }
+  for (let y = 0; y < alto; y++) {
+    cola.push(y * ancho, y * ancho + ancho - 1);
+  }
 }
 let quitados = 0;
 while (cola.length) {

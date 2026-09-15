@@ -26,8 +26,13 @@ sus endpoints. Lo único común son los componentes de gráfico y `chartTheme`.
 **Escudo del área**: `logoArchivo` en `areas.js` nombra un PNG de
 `client/public/`. `/api/areas` devuelve `logo` solo si el archivo existe, así
 que alcanza con dejarlo ahí para que la tarjeta lo muestre (y sin él usa la
-sigla, sin pedir un 404). Hoy están `logo-ppc.png` y `logo-dc.png`; el COMM no
-lleva escudo porque su identidad ya la da el membrete del navbar.
+sigla, sin pedir un 404). Hoy están `logo-comm.png`, `logo-ppc.png` y
+`logo-dc.png`.
+El del COM llegó con tinta NEGRA sobre blanco: sobre el navy el "COM" no se
+veía. Se pasó a negativo con `node scripts/quitarFondo.js entrada.png salida.png
+negativo 40` (el blanco se vuelve transparencia, la tinta neutra pasa a blanco y
+los arcos azul y dorado conservan su color). Es apaisado, por eso `.area-logo`
+tiene `max-width: 100px`: con el tope anterior quedaba más bajo que los escudos.
 ⚠️ Tiene que ser **PNG con fondo transparente**: las tarjetas son navy oscuro y
 un fondo opaco deja un cuadrado blanco o negro alrededor del escudo. Ninguno de
 los dos vino así (ver [`brand/README.md`](brand/README.md)); se limpiaron con

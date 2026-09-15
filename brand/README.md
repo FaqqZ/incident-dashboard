@@ -9,15 +9,30 @@ disco de quien los mandó.
 |---|---|---|
 | `logo-ppc-fuente.png` (355×434) | JPEG de WhatsApp | tenía la transparencia aplanada contra **negro** |
 | `logo-dc-fuente.png` (577×578) | PNG de 2056×2048 | tenía fondo **blanco** opaco |
+| `logo-comm-fuente.png` (660×403) | PNG de 1024×1024 ("LOGO COM") | tinta **negra** sobre blanco: se pasó a negativo |
 
-En los dos casos el fondo se sacó con [`../scripts/quitarFondo.js`](../scripts/quitarFondo.js),
-que inunda desde los bordes en vez de marcar todo píxel claro u oscuro: así el
-blanco del anillo de Defensa Civil —el que lleva el texto— no se borra, y el
-escudo sigue legible sobre el navy del tablero.
+En los escudos de PPC y Defensa Civil el fondo se sacó con
+[`../scripts/quitarFondo.js`](../scripts/quitarFondo.js), que inunda desde los
+bordes en vez de marcar todo píxel claro u oscuro: así el blanco del anillo de
+Defensa Civil —el que lleva el texto— no se borra, y el escudo sigue legible
+sobre el navy del tablero.
+
+El logo del COM no alcanzaba con quitarle el fondo: el "COM" negro no se ve
+sobre el navy. El modo `negativo` del mismo script convierte el blanco en
+transparencia píxel a píxel (sin halo en los bordes), pasa la tinta neutra a
+blanco y deja los arcos azul y dorado con su color.
 
 Para regenerar lo que se publica:
 
 ```bash
 sips -Z 240 brand/logo-dc-fuente.png --out client/public/logo-dc.png
 sips -Z 240 brand/logo-ppc-fuente.png --out client/public/logo-ppc.png
+sips -Z 240 brand/logo-comm-fuente.png --out client/public/logo-comm.png
+```
+
+Para rehacer el negativo del COM desde el original:
+
+```bash
+sips -s format png -Z 768 "LOGO COM.png" --out com-768.png
+node scripts/quitarFondo.js com-768.png brand/logo-comm-fuente.png negativo 40
 ```

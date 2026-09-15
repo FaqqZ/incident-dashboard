@@ -39,6 +39,7 @@ const AREAS = [
     archivo: "incidentes.xlsx",
     // Fuente complementaria: la planilla de recurrencia ya clasificada.
     archivoExtra: "siniestralidad.xlsx",
+    logoArchivo: "logo-comm.png",
   },
   {
     id: "defensa-civil",
