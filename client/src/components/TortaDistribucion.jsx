@@ -18,9 +18,12 @@ const pct = (v, total) => (total ? (v / total) * 100 : 0);
 
 // Secuencia categórica del tema, ya calibrada para el fondo oscuro. El primer
 // lugar lo ocupa el amarillo del máximo, así que arranca en la segunda.
+// El primer lugar nunca se usa (la porción mayor va en el amarillo del máximo),
+// así que ahí queda --c6: es un ámbar que en la quinta posición se confundía con
+// ese amarillo, y en el tablero el amarillo significa "máximo".
 const PALETA = [
-  "var(--c7)", "var(--c2)", "var(--c4)", "var(--c3)",
-  "var(--c6)", "var(--c1)", "var(--c8)", "var(--c5)",
+  "var(--c6)", "var(--c2)", "var(--c4)", "var(--c3)",
+  "var(--c7)", "var(--c1)", "var(--c8)", "var(--c5)",
 ];
 const OTRAS = "var(--ink-3)";
 

@@ -312,7 +312,7 @@ export default function DCDashboard() {
                       ver cómo cambió la composición.
                     </div>
                   ) : (
-                    <EvolucionApilada series={data.serieCategorias} tope={6}
+                    <EvolucionApilada series={data.serieCategorias} tope={8}
                       seleccionado={catSel} />
                   )}
                 </div>

@@ -11,9 +11,10 @@
 // categorías, no contra la suma de las que se ven: es la pregunta "qué parte de
 // lo que entró ese mes fue esto".
 //
-// En "Todas, apiladas" van las seis principales y el resto en "Otras" (con
-// veintiuna franjas no se distinguiría ninguna). Debajo, una tabla de
-// referencia con la participación de cada una mes a mes.
+// En "Todas, apiladas" se dibujan las ocho principales y el resto NO: una
+// franja gris de "Otras" con quince categorías ocupaba un tercio del alto y a
+// vista ejecutiva se leía como la categoría predominante. El resto sigue en la
+// tabla de referencia (cada columna suma 100%) y en el resumen.
 
 import { useEffect, useId, useState } from "react";
 import {
@@ -39,9 +40,12 @@ function techoEje(valor) {
   return factor * magnitud * 4;
 }
 
+// El primer lugar nunca se usa (la categoría principal va en el amarillo del
+// máximo), así que ahí queda --c6: es un ámbar que en la quinta posición se
+// confundía con ese amarillo, y en el tablero el amarillo significa "máximo".
 const PALETA = [
-  "var(--c7)", "var(--c2)", "var(--c4)", "var(--c3)",
-  "var(--c6)", "var(--c1)", "var(--c8)", "var(--c5)",
+  "var(--c6)", "var(--c2)", "var(--c4)", "var(--c3)",
+  "var(--c7)", "var(--c1)", "var(--c8)", "var(--c5)",
 ];
 const OTRAS = "var(--ink-3)";
 const TODAS = "__todas";
@@ -279,62 +283,66 @@ export default function EvolucionApilada({ series, tope = 6, seleccionado = "" }
   }
 
   // --- Todas, apiladas --------------------------------------------------------
+  const enPct = modo === "pct";
   const visibles = series.slice(0, tope);
   const cola = series.slice(tope);
   // dataKey por posición y no por nombre: Recharts lee el dataKey como una ruta
   // con puntos, y hay etiquetas como "Sin señalizar." que la romperían.
-  const capas = [
-    ...visibles.map((s, i) => ({
-      dk: `s${i}`,
-      nombre: s.tipo,
-      color: i === 0 ? MAXIMO : PALETA[i % PALETA.length],
-      agrupada: false,
-      valores: enRango(s.puntos.map((p) => p.value || 0)),
-    })),
-    ...(cola.length
-      ? [{
-          dk: "otras",
-          nombre: `Otras (${cola.length})`,
-          color: OTRAS,
-          agrupada: true,
-          valores: enRango(meses.map((_, i) => cola.reduce((acc, s) => acc + (s.puntos[i]?.value || 0), 0))),
-        }]
-      : []),
-  ];
+  const capas = visibles.map((s, i) => ({
+    dk: `s${i}`,
+    nombre: s.tipo,
+    color: i === 0 ? MAXIMO : PALETA[i % PALETA.length],
+    valores: enRango(s.puntos.map((p) => p.value || 0)),
+  }));
+  // El resto no se dibuja: solo va a la tabla y al resumen.
+  const resto = cola.length
+    ? {
+        nombre: `Resto (${cola.length} categorías)`,
+        valores: enRango(meses.map((_, i) => cola.reduce((acc, s) => acc + (s.puntos[i]?.value || 0), 0))),
+      }
+    : null;
+
   const datos = mesesRango.map((mes, j) => {
     const fila = { mes: cap(mes), __total: totalMesRango[j] };
-    capas.forEach((c) => { fila[c.dk] = c.valores[j]; });
+    capas.forEach((c) => {
+      fila[`${c.dk}_n`] = c.valores[j];
+      // En % cada franja mide su parte del total REAL del mes (no un 100%
+      // repartido entre las que se ven): lo que falta hasta 100 es el resto.
+      fila[c.dk] = enPct ? +pct(c.valores[j], totalMesRango[j]).toFixed(2) : c.valores[j];
+    });
     return fila;
   });
 
-  // Categoría con mayor participación en cada mes (sin contar "Otras", que es
-  // un agregado de quince y no una categoría).
+  const sumaPrincipales = capas.reduce((acc, c) => acc + c.valores.reduce((a, b) => a + b, 0), 0);
+  const sumaResto = resto ? resto.valores.reduce((a, b) => a + b, 0) : 0;
+
+  // Categoría con mayor participación en cada mes.
   const lideres = mesesRango.map((_, j) => {
-    let mejor = -1;
-    capas.forEach((c, k) => {
-      if (c.agrupada) return;
-      if (mejor < 0 || c.valores[j] > capas[mejor].valores[j]) mejor = k;
-    });
+    let mejor = 0;
+    capas.forEach((c, k) => { if (c.valores[j] > capas[mejor].valores[j]) mejor = k; });
     return mejor;
   });
+
+  const filasTabla = [
+    ...capas.map((c, k) => ({ ...c, clave: c.dk, indice: k, esResto: false })),
+    ...(resto ? [{ ...resto, clave: "resto", color: OTRAS, esResto: true }] : []),
+  ];
 
   return (
     <>
       {barra}
 
       <ResponsiveContainer width="100%" height={360}>
-        <AreaChart
-          data={datos}
-          margin={{ left: -8, right: 16, top: 10 }}
-          stackOffset={modo === "pct" ? "expand" : undefined}
-        >
+        <AreaChart data={datos} margin={{ left: -8, right: 16, top: 10 }}>
           {defsGrafico(ids, { colores: capas.map((c) => c.color) })}
           <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 5" />
           <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "var(--ink-3)" }} interval={0} />
           <YAxis
             tick={{ fontSize: 12, fill: "var(--ink-3)" }}
-            allowDecimals={modo === "pct"}
-            tickFormatter={(v) => (modo === "pct" ? `${Math.round(v * 100)}%` : nf(v))}
+            allowDecimals={false}
+            domain={[0, (max) => techoEje(enPct ? max : max * 1.05)]}
+            tickCount={5}
+            tickFormatter={(v) => (enPct ? `${nf(v)}%` : nf(v))}
           />
           <Tooltip
             {...TOOLTIP}
@@ -342,11 +350,14 @@ export default function EvolucionApilada({ series, tope = 6, seleccionado = "" }
               const total = payload?.[0]?.payload?.__total;
               return total !== undefined ? `${l} · ${nf(total)} denuncias` : l;
             }}
-            formatter={(v, n, p) => [`${nf(v)} · ${nf(pct(v, p.payload.__total), 1)}%`, n]}
+            formatter={(_, n, item) => {
+              const cantidad = item.payload[`${item.dataKey}_n`];
+              return [`${nf(cantidad)} · ${nf(pct(cantidad, item.payload.__total), 1)}%`, n];
+            }}
           />
           <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} iconType="circle" iconSize={9} />
           {/* Recharts apila en el orden en que se declaran: la categoría más
-              grande abajo, apoyada en el eje, y "Otras" arriba. */}
+              grande abajo, apoyada en el eje. */}
           {capas.map((c, i) => (
             <Area
               key={c.dk}
@@ -365,7 +376,7 @@ export default function EvolucionApilada({ series, tope = 6, seleccionado = "" }
       </ResponsiveContainer>
 
       {/* Referencia mes a mes: participación de cada categoría sobre el total
-          de denuncias de ese mes. Cada columna suma 100%. */}
+          de denuncias de ese mes. Con la fila del resto, cada columna suma 100%. */}
       <div className="tabla-scroll">
         <table className="tabla-participacion">
           <thead>
@@ -376,13 +387,13 @@ export default function EvolucionApilada({ series, tope = 6, seleccionado = "" }
             </tr>
           </thead>
           <tbody>
-            {capas.map((c, k) => {
-              const suma = c.valores.reduce((a, b) => a + b, 0);
+            {filasTabla.map((f) => {
+              const suma = f.valores.reduce((a, b) => a + b, 0);
               return (
-                <tr key={c.dk}>
-                  <th scope="row"><i style={{ background: c.color }} />{c.nombre}</th>
-                  {c.valores.map((v, j) => (
-                    <td key={j} className={lideres[j] === k ? "lider" : undefined}
+                <tr key={f.clave} className={f.esResto ? "fila-resto" : undefined}>
+                  <th scope="row"><i style={{ background: f.color }} />{f.nombre}</th>
+                  {f.valores.map((v, j) => (
+                    <td key={j} className={!f.esResto && lideres[j] === f.indice ? "lider" : undefined}
                       title={`${nf(v)} de ${nf(totalMesRango[j])} denuncias`}>
                       {nf(pct(v, totalMesRango[j]), 1)}%
                     </td>
@@ -405,10 +416,16 @@ export default function EvolucionApilada({ series, tope = 6, seleccionado = "" }
       </div>
 
       <p className="evol-resumen">
-        Participación de cada categoría sobre el total de denuncias de cada mes,
-        {desde === hasta ? ` en ${periodoTexto}` : ` entre ${periodoTexto}`}. En amarillo, la
-        categoría que más pesó en cada mes. Las {visibles.length} principales
-        {cola.length ? ` y ${cola.length} más agrupadas en “Otras”` : ""}.
+        Las {capas.length} categorías principales explican el{" "}
+        <b>{nf(pct(sumaPrincipales, totalRango), 1)}%</b> de las denuncias
+        {desde === hasta ? ` de ${periodoTexto}` : ` entre ${periodoTexto}`}.
+        {resto && (
+          <>
+            {" "}Las otras {cola.length} ({nf(pct(sumaResto, totalRango), 1)}%) no se dibujan para
+            que el gráfico se lea de un vistazo; figuran en la tabla como “Resto”.
+          </>
+        )}
+        {" "}En amarillo, la categoría que más pesó en cada mes.
       </p>
     </>
   );

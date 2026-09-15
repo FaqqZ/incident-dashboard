@@ -2192,3 +2192,15 @@ button.torta-fila:focus-visible {
   font-weight: 500;
   border-bottom: none;
 }
+
+/* Fila del resto en la tabla de participación: está para que cada columna
+   sume 100%, no para competir con las categorías que se grafican. */
+.tabla-participacion tr.fila-resto th,
+.tabla-participacion tr.fila-resto td {
+  color: var(--ink-3);
+  font-weight: 400;
+}
+
+.tabla-participacion tr.fila-resto .col-periodo {
+  color: var(--ink-3);
+}
