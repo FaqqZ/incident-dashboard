@@ -3,13 +3,14 @@
   "buildCommand": "npm run build",
   "outputDirectory": "client/dist",
   "functions": {
-    "api/[...path].js": {
+    "api/index.js": {
       "includeFiles": "{server/seed/**,server/data/**,client/public/logo-*.png}",
       "maxDuration": 30,
       "memory": 1024
     }
   },
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
