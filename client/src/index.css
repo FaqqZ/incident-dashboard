@@ -2015,3 +2015,180 @@ button.torta-fila:focus-visible {
   color: var(--ink-2);
   line-height: 1.5;
 }
+
+/* Barra de controles del gráfico de evolución: la categoría a la izquierda y,
+   a la derecha, período y modo en formato mínimo. */
+.evol-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin-bottom: 14px;
+}
+
+.evol-toolbar .evol-campo {
+  margin-bottom: 0;
+  flex: 1 1 280px;
+}
+
+.evol-controles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  padding-bottom: 4px;
+}
+
+/* Período: se lee como texto ("Enero – Julio") pero el subrayado punteado y el
+   calendario dicen que se puede tocar. */
+.evol-rango {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.evol-rango-icono {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.evol-rango select {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed var(--ink-3);
+  border-radius: 0;
+  padding: 2px 2px 3px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.evol-rango select:hover,
+.evol-rango select:focus-visible {
+  color: var(--color-4);
+  border-bottom-color: var(--color-4);
+  outline: none;
+}
+
+.evol-rango select option {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+.evol-reset {
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--color-4);
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.evol-reset:hover { text-decoration: underline; }
+
+/* Cantidad / % del mes */
+.evol-modo {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.evol-modo button {
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-3);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.evol-modo button[aria-pressed="true"] {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+
+.evol-modo button:focus-visible,
+.evol-reset:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Tabla de referencia: participación mes a mes, cada columna suma 100%. */
+.tabla-participacion {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 14px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla-participacion th,
+.tabla-participacion td {
+  padding: 6px 9px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.tabla-participacion thead th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.tabla-participacion thead th:first-child,
+.tabla-participacion tbody th,
+.tabla-participacion tfoot th {
+  text-align: left;
+}
+
+.tabla-participacion tbody th {
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.tabla-participacion tbody th i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 7px;
+  vertical-align: 1px;
+}
+
+.tabla-participacion td { color: var(--ink-2); }
+
+.tabla-participacion td.lider {
+  color: var(--graf-max);
+  font-weight: 700;
+}
+
+.tabla-participacion .col-periodo {
+  color: var(--ink);
+  font-weight: 600;
+  border-left: 1px solid var(--border);
+}
+
+.tabla-participacion tfoot th,
+.tabla-participacion tfoot td {
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 500;
+  border-bottom: none;
+}

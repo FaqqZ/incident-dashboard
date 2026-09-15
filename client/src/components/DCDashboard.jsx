@@ -297,8 +297,8 @@ export default function DCDashboard() {
                 <div className={`panel panel-wide${orgSel ? " panel-sin-cruce" : ""}`}>
                   <h3>Evolución de la composición</h3>
                   <p className="panel-sub">
-                    Elegí cualquier categoría para ver su evolución mes a mes y su mes pico ·
-                    arranca con la principal del período
+                    Elegí una categoría, el período y si ver cantidades o su participación
+                    sobre el total de denuncias de cada mes
                   </p>
                   {orgSel && (
                     <p className="nota-cruce">
