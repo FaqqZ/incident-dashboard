@@ -6,25 +6,22 @@
 // clasificación precalculada en Excel. Mezclarla con las demás categorías, que
 // responden a los filtros generales, confundía las dos lecturas.
 
-import { Link } from "react-router-dom";
+import TopBar from "./TopBar";
 import IndicadoresSV from "./IndicadoresSV";
 import RecurrenciaPanel from "./RecurrenciaPanel";
 
 export default function SiniestrosViales() {
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <img
-            className="logo"
-            src="/logo-smt-negativo.png"
-            alt="Ciudad SMT · Subsecretaría de Seguridad Ciudadana"
-          />
-          <span className="brand-divider" aria-hidden="true" />
-          <h1>Siniestros viales detectados por el COMM</h1>
-        </div>
-        <Link to="/comm" className="btn">Volver al tablero</Link>
-      </header>
+      <TopBar
+        titulo="Siniestros viales detectados por el COMM"
+        menu={[
+          { to: "/comm", label: "Volver al tablero" },
+          { to: "/comm/analisis", label: "Análisis por categoría" },
+          { to: "/comm/datos", label: "Gestión de datos" },
+          { to: "/", label: "Cambiar de área" },
+        ]}
+      />
 
       <main className="canvas vista-siniestros">
         <IndicadoresSV />

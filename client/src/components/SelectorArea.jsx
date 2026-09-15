@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import TopBar from "./TopBar";
 import { fetchAreas } from "../api";
 
 const nf = (n) => (n ?? 0).toLocaleString("es-AR");
@@ -23,14 +24,8 @@ export default function SelectorArea() {
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <img className="logo" src="/logo-smt-negativo.png"
-            alt="Ciudad SMT · Subsecretaría de Seguridad Ciudadana" />
-          <span className="brand-divider" aria-hidden="true" />
-          <h1>Tableros de Seguridad Ciudadana</h1>
-        </div>
-      </header>
+      {/* La portada no lleva menú: elegir el área ES el menú. */}
+      <TopBar titulo="Tableros de Seguridad Ciudadana" />
 
       <main className="canvas">
         <div className="portada">
@@ -56,12 +51,24 @@ export default function SelectorArea() {
             {areas.map((a) => {
               const contenido = (
                 <>
-                  <span className="area-sigla">{a.sigla}</span>
+                  {/* El escudo del área, si lo tiene. Las que no (el COMM usa
+                      el membrete institucional) quedan solo con la sigla. */}
+                  <div className="area-marca">
+                    {a.logo ? (
+                      // El escudo ya lleva la sigla adentro: repetirla al lado
+                      // la mostraría dos veces.
+                      <img className="area-logo" src={a.logo} alt={`Escudo de ${a.nombre}`} />
+                    ) : (
+                      <span className="area-sigla">{a.sigla}</span>
+                    )}
+                  </div>
                   <h3>{a.nombre}</h3>
                   <p>{a.descripcion}</p>
                   <span className={`area-estado ${a.listo ? "ok" : "pendiente"}`}>
+                    {/* "en la base" y no "cargados": la unidad de cada área
+                        cambia de género (incidentes / intervenciones). */}
                     {a.listo
-                      ? `${nf(a.registros)} registros cargados`
+                      ? `${nf(a.registros)} ${a.unidad || "registros"} en la base`
                       : a.error
                         ? "Con errores en la base"
                         : "Sin base de datos todavía"}

@@ -3,6 +3,8 @@ client/node_modules
 server/node_modules
 client/dist
 server/data/tmp
+# Respaldos de "Limpiar base": copias completas de la base, no las lee la API.
+server/data/backups
 .claude
 *.log
 .DS_Store

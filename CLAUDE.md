@@ -4,15 +4,81 @@ Dashboard web que reemplaza un tablero de Power BI de Seguridad Ciudadana
 (Municipalidad de San Miguel de Tucumán). Backend Node/Express + SheetJS que lee
 un Excel y sirve datos agregados; frontend React (Vite) + Leaflet + Recharts.
 
+## Áreas (casos de estudio)
+El tablero dejó de ser exclusivo del COMM. La raíz `/` es un **selector de
+área** y cada área cuelga de su prefijo. Se declaran en `server/areas.js`, que
+además marca `disponible` según exista o no su Excel en `DATA_DIR`.
+
+| Área | Ruta | Excel | Estado |
+|---|---|---|---|
+| Centro Operativo de Monitoreo Municipal | `/comm` | `incidentes.xlsx` + `siniestralidad.xlsx` | completo (con mapa) |
+| Patrulla de Protección Ciudadana | `/ppc` | `ppc.xlsx` | completo (**sin mapa**) |
+| Defensa Civil | `/defensa-civil` | `defensa-civil.xlsx` | completo (**sin mapa**) |
+
+**El COMM es la única con mapa.** Las otras dos reciben la base ya agregada por
+mes, sin domicilio ni coordenadas: no hay nada que georreferenciar. Por eso
+tampoco tienen filtro de fechas por día, turno ni franja horaria — la unidad
+mínima de su dato es el mes.
+
+Las áreas NO comparten modelo de datos ni medidas: cada una tiene su lector y
+sus endpoints. Lo único común son los componentes de gráfico y `chartTheme`.
+
+**Escudo del área**: `logoArchivo` en `areas.js` nombra un PNG de
+`client/public/`. `/api/areas` devuelve `logo` solo si el archivo existe, así
+que alcanza con dejarlo ahí para que la tarjeta lo muestre (y sin él usa la
+sigla, sin pedir un 404). Hoy están `logo-ppc.png` y `logo-dc.png`; el COMM no
+lleva escudo porque su identidad ya la da el membrete del navbar.
+⚠️ Tiene que ser **PNG con fondo transparente**: las tarjetas son navy oscuro y
+un fondo opaco deja un cuadrado blanco o negro alrededor del escudo. Ninguno de
+los dos vino así (ver [`brand/README.md`](brand/README.md)); se limpiaron con
+`scripts/quitarFondo.js`. Los masters transparentes quedaron en `brand/`, así
+que reexportar a otro tamaño no depende de los archivos originales.
+
 ## Estructura
-- `server/` — API. `index.js` (endpoints), `excelReader.js` (lectura + cruce +
-  medidas), `generateSample.js` (datos de prueba).
+- `server/` — API.
+  - `index.js` (endpoints), `areas.js` (registro de áreas).
+  - `excelReader.js` — COMM: lectura + cruce con cámaras + medidas.
+  - `ppcReader.js` — PPC: matriz mensual + medidas.
+  - `generateSample.js` (datos de prueba).
 - `client/` — React.
-  - `App.jsx` es SOLO el router: `/` → `components/Dashboard.jsx`,
-    `/datos` → `components/DataUpload.jsx`. La vista ejecutiva (KPIs, mapa,
-    gráficos) se arma en **Dashboard.jsx**, no en App.jsx.
+  - `App.jsx` es SOLO el router. Las vistas se arman en `components/`:
+    `SelectorArea.jsx` (`/`), `Dashboard.jsx` (`/comm`),
+    `PPCDashboard.jsx` (`/ppc`), `DataUpload.jsx` (`/comm/datos`).
+    La vista ejecutiva del COMM está en **Dashboard.jsx**, no en App.jsx.
   - `components/` — KPIs, mapa, gráficos.
-  - `store/useFilters.js` — estado de filtros compartido (cross-filter).
+  - `TopBar.jsx` — **encabezado único de TODAS las vistas**. Ninguna arma el
+    suyo. Recibe `titulo`, `resumen` y `menu` (los enlaces, que van detrás del
+    botón hamburguesa) más `acciones` para botones sueltos como el de exportar.
+    Antes cada vista tenía su barra: el COMM llegó a cinco botones en línea y
+    la Patrulla tenía uno, con lo cual se veían como sistemas distintos.
+  - `KpiCard.jsx` — baja el cuerpo del valor según su largo (>9 → 24px,
+    >20 → 19px). Sin eso, valores como "Prevencion" o "Defensa Civil
+    Municipal" se parten al medio de la palabra contra el borde de la tarjeta.
+  - **Compartidos por PPC y Defensa Civil** (las dos áreas sin mapa):
+    `BarrasPorTipo.jsx` (barras con selección), `MiniSeries.jsx` (un mini
+    gráfico por serie, cada uno con su escala) y `MatrizMesTipo.jsx` (tabla
+    mes × tipo). Antes se llamaban `PPC*`; se renombraron al sumarse DC.
+  - **Solo Defensa Civil**: `TortaDistribucion.jsx` (anillo con leyenda
+    clickeable) y `EvolucionApilada.jsx` (áreas apiladas por mes). DC usa
+    estos y NO las barras/matriz de la Patrulla, a propósito: la pregunta acá
+    es qué parte del total se lleva cada categoría y si esa mezcla se movió,
+    mientras que la Patrulla rankea nueve tipos y para eso las barras sirven
+    mejor. En los dos, la porción o capa más grande va en amarillo.
+  - `chartTheme.jsx` — regla de paleta: el máximo SIEMPRE en amarillo
+    (`--color-1`), el resto en azul. Vale para todos los gráficos con un máximo.
+    También define los degradés y el halo del máximo en `defsGrafico(ids)`.
+    ⚠️ **`defsGrafico` NO es un componente y no se usa como `<DefsGrafico />`.**
+    Recharts filtra los hijos de un gráfico por tipo y descarta los que son
+    componentes propios: se ve un `<defs>` en el DOM (el de Recharts) pero
+    vacío, y todo lo que referencie `url(#…)` queda sin relleno. Por eso se
+    INVOCA — `{defsGrafico(ids)}` — para que Recharts reciba el elemento
+    directo. Los id salen de `useIdsGrafico()`, uno por instancia, porque los
+    id de `<defs>` son globales al documento.
+    Las transiciones van en CSS, NO en las animaciones de Recharts: esas
+    siguen apagadas porque los puntos y las etiquetas de valor recién se
+    dibujan cuando la animación termina y quedaban invisibles.
+  - `store/useFilters.js` — filtros del COMM (cross-filter). La PPC NO lo usa:
+    tiene sus propios filtros en estado local, porque no comparte campos.
   - `hooks/useNarrowScreen.js` — breakpoint 900px en JS. Los ejes de Recharts se
     miden en px fijos, así que el CSS solo no alcanza para el layout responsive.
 
@@ -108,6 +174,98 @@ Sin ese filtro los números son otros (total 29.114, categoría top TRÁNSITO. c
 - Turnos: intermedio, mañana, noche, tarde.
 - Clases: CAM, DOM.
 - Rango de fechas: 2026-01-01 → 2026-07-31 (enero a julio).
+
+## Patrulla de Protección Ciudadana (`ppc.xlsx`)
+Base con una forma COMPLETAMENTE distinta a la del COMM: no hay un registro por
+intervención, sino una **matriz ya agregada** — meses en las filas, tipos de
+intervención en las columnas (hoja `Hoja1`, 8 meses × 9 tipos, 6.199
+intervenciones de enero a agosto de 2026).
+
+De ahí salen las diferencias de la vista, y NO son decisiones de diseño:
+- **No hay mapa.** No hay domicilio, dispositivo ni coordenadas: no hay nada
+  que georreferenciar. Tampoco hay turno, hora ni día de la semana.
+- El filtro de fechas es un **rango de meses**, no un calendario: la unidad
+  mínima del dato es el mes.
+- No hay puntos críticos, ni percentiles, ni recurrencia territorial. Toda la
+  metodología COMM (P75/P90/P95 por punto) necesita puntos, y acá no los hay.
+
+⚠️ **`Intervencion general` NO es un tipo: es el total de la fila.** En los ocho
+meses la suma de las otras nueve columnas da exactamente ese número. Contarla
+como una categoría más duplicaría todos los totales. `ppcReader.js` no se fía
+del nombre: `detectarColumnaTotal` verifica la identidad mes a mes, así que la
+planilla puede renombrar la columna sin romper el cálculo.
+
+Prevención se lleva el **63,2%** del acumulado (3.916 de 6.199). Es el único
+tipo de despliegue planificado; los otros ocho son respuesta a un hecho. Por eso
+la vista muestra esa proporción aparte: sin distinguirla, el volumen total de la
+Patrulla se lee como si fuera todo respuesta a emergencias.
+
+Y por eso la evolución por tipo son **mini gráficos con escala propia** y no un
+apilado: entre Prevención (3.916) y Derrumbe (7) hay tres órdenes de magnitud, y
+con eje compartido los tipos chicos quedan pegados al cero.
+
+Endpoints: `GET /api/ppc` (filtros `tipo`, `mesDesde`, `mesHasta`) y
+`GET /api/ppc/options`. Validación rápida:
+
+```bash
+curl -s localhost:4000/api/ppc | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(j.kpis.total, j.meta.totalCoincide, j.matriz.tipos.length)})"
+```
+
+Debe imprimir `6199 true 9`. `totalCoincide` contrasta la suma recalculada
+contra la columna total del Excel; si diera `false`, el tablero muestra un
+banner de aviso y usa SIEMPRE la suma recalculada.
+
+## Defensa Civil (`defensa-civil.xlsx`)
+⚠️ **La fuente es la hoja `Resumen Mensual`, NO la hoja `Base Operativa`.** El
+Excel trae las dos y no coinciden. La Base Operativa es el volcado del libro de
+guardia (3.833 filas) y está sucia: `FECHA` tiene 332 valores no numéricos
+("2/9/0206", "16//02/2026") y 13 fechas fuera de 2026 (una de 1961, otra de
+2027), y en 175 filas el mes no se corresponde con la fecha. Además le falta un
+mes entero. El Resumen viene de otro sistema, es el dato que Defensa Civil da
+por bueno y es el que lee el tablero.
+
+La hoja trae DOS matrices con la misma forma que la de la PPC:
+
+| Matriz | Qué mide | Filas | Total |
+|---|---|---|---|
+| Categorías de denuncia | qué pasó | 21 con datos | 3.532 netas + 648 de registro interno |
+| Organismos / derivaciones | a quién se derivó | 26 con datos | 3.532 |
+
+⚠️ **Las dos matrices NO se pueden cruzar.** La hoja da los totales de cada una
+por separado, no la combinación: saber que hubo 590 emergencias eléctricas y
+470 derivaciones a EDET no permite afirmar cuántas de esas 590 fueron a EDET.
+Por eso el tablero deja elegir **una dimensión por vez** — elegir un organismo
+suelta la categoría y viceversa.
+
+⚠️ **Un mes está rotulado distinto en cada matriz**: la columna 7 figura como
+*Julio* en la de categorías y como *Agosto* en la de derivaciones. Son la misma
+columna —el "Subtotal operativo neto" de las dos coincide valor por valor, y
+`dcReader.js` lo verifica en `alineacionVerificada` antes de alinearlas por
+posición—, pero cuál es el mes real no se puede deducir del archivo. Hay que
+corregirlo en la planilla. Cruzarlas por NOMBRE perdía los 327 registros de ese
+mes (`totalDerivado` daba 3.205 en vez de 3.532).
+
+**"Registro operativo interno" no es una denuncia**: son los asientos de
+apertura y cierre de guardia (648 de 4.180 = 15,5%). La separación no es un
+criterio propio: la hace la planilla con su fila "Subtotal operativo neto"
+(Total general − Registro operativo interno), y el tablero usa ESE neto como
+universo. Por eso el selector de áreas dice 3.532 y no 4.180.
+
+Seis etiquetas quedaron fuera de las 16 categorías del clasificador (18
+denuncias): `Infraestructura urbana` (9), `911` (5), `Bacheo`, `Buenos Aires`,
+`Sin señalizar.` y `Please provide the incident description you would like me
+to classify.` — un error de un clasificador automático que quedó guardado como
+dato. Los conteos se respetan tal cual; el tablero los avisa en un banner y los
+deja debajo del corte de 15 barras. Lo que hay que corregir es la etiqueta.
+
+Endpoints: `GET /api/dc` (filtros `dimension` ∈ {categoria, organismo},
+`valor`, `mesDesde`, `mesHasta`) y `GET /api/dc/options`. Validación rápida:
+
+```bash
+curl -s localhost:4000/api/dc | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const j=JSON.parse(d);console.log(j.kpis.neto,j.kpis.interno,j.kpis.totalGeneral,j.meta.netoCuadra,j.meta.alineacionVerificada)})"
+```
+
+Debe imprimir `3532 648 4180 true true`.
 
 ## Pendiente para producción
 Login de usuarios, seguridad por filas (RLS), refresco automático del Excel

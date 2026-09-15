@@ -9,6 +9,8 @@ const fs = require("fs");
 require("dotenv").config();
 
 const R = require("./excelReader");
+const PPC = require("./ppcReader");
+const DC = require("./dcReader");
 const { listarAreas } = require("./areas");
 
 const app = express();
@@ -82,6 +84,68 @@ const SINIESTRALIDAD_PATH =
 let recurrencia = { puntos: [], meta: {}, loadedAt: null, error: null };
 let indicadoresSV = { datos: null, loadedAt: null, error: null };
 
+// Patrulla de Protección Ciudadana: base propia, con forma de matriz mensual.
+// Vive aparte del COMM porque no comparte ni el modelo ni las medidas.
+const PPC_PATH =
+  process.env.PPC_PATH ||
+  [path.join(DATA_DIR, "ppc.xlsx"), path.join(SEED_DIR, "ppc.xlsx")].find((p) =>
+    fs.existsSync(p)
+  ) ||
+  path.join(DATA_DIR, "ppc.xlsx");
+
+let ppc = { datos: null, loadedAt: null, error: null };
+
+// Defensa Civil: lee la hoja de resumen mensual, no el volcado del libro de
+// guardia (ver dcReader.js).
+const DC_PATH =
+  process.env.DC_PATH ||
+  [path.join(DATA_DIR, "defensa-civil.xlsx"), path.join(SEED_DIR, "defensa-civil.xlsx")].find((p) =>
+    fs.existsSync(p)
+  ) ||
+  path.join(DATA_DIR, "defensa-civil.xlsx");
+
+let dc = { datos: null, loadedAt: null, error: null };
+
+function reloadDC() {
+  try {
+    const datos = DC.loadDC(DC_PATH);
+    dc = { datos, loadedAt: new Date().toISOString(), error: null };
+    const m = datos.meta;
+    console.log(
+      `[dc] ${m.totalNeto} denuncias netas + ${m.totalInterno} de registro interno ` +
+        `= ${m.totalNeto + m.totalInterno} | ${m.mesesObservados} meses (${m.periodo}) | ` +
+        `${m.categoriasDetectadas} categorías, ${m.organismosDetectados} organismos | ` +
+        `cuadra: ${m.netoCuadra && m.totalCuadra ? "sí" : "NO"}`
+    );
+    if (m.mesesEnConflicto.length) {
+      console.warn(
+        `[dc] ⚠️ las dos matrices rotulan distinto la misma columna: ` +
+          m.mesesEnConflicto
+            .map((c) => `posición ${c.posicion} = "${c.categorias}" / "${c.derivaciones}"`)
+            .join(", ")
+      );
+    }
+  } catch (err) {
+    dc = { datos: null, loadedAt: null, error: err.message };
+    console.error("[dc] Error al cargar el Excel:", err.message);
+  }
+}
+
+function reloadPPC() {
+  try {
+    const datos = PPC.loadPPC(PPC_PATH);
+    ppc = { datos, loadedAt: new Date().toISOString(), error: null };
+    console.log(
+      `[ppc] ${datos.meta.total} intervenciones | ${datos.meta.mesesObservados} meses ` +
+        `(${datos.meta.periodo}) | ${datos.meta.tiposDetectados} tipos | ` +
+        `total ${datos.meta.totalCoincide ? "coincide" : "NO coincide"} con el Excel`
+    );
+  } catch (err) {
+    ppc = { datos: null, loadedAt: null, error: err.message };
+    console.error("[ppc] Error al cargar el Excel:", err.message);
+  }
+}
+
 function reload() {
   let cameras = null;
   try {
@@ -128,6 +192,9 @@ function reload() {
     indicadoresSV = { datos: null, loadedAt: null, error: err.message };
     console.error("[indicadores] Error al calcular indicadores:", err.message);
   }
+
+  reloadPPC();
+  reloadDC();
 }
 reload();
 
@@ -149,18 +216,81 @@ function getFilters(req) {
 // Áreas de la Subsecretaría. La pantalla de inicio arma el selector con esto y
 // marca cuáles tienen datos cargados y cuáles siguen pendientes.
 app.get("/api/areas", (req, res) => {
-  const areas = listarAreas(DATA_DIR).map((a) =>
-    a.id === "comm"
-      ? {
-          ...a,
-          // El COMM es el único con pipeline armado: se informa su estado real.
-          registros: state.records.length,
-          error: state.error,
-          listo: !state.error && state.records.length > 0,
-        }
-      : { ...a, registros: null, error: null, listo: false }
-  );
+  // Cada área informa su propio estado; las que todavía no tienen pipeline
+  // quedan con listo:false y la tarjeta del selector se muestra apagada.
+  const estados = {
+    comm: {
+      registros: state.records.length,
+      error: state.error,
+      listo: !state.error && state.records.length > 0,
+      unidad: "incidentes",
+    },
+    ppc: {
+      // La unidad de la PPC es el mes: el Excel viene agregado, no por hecho.
+      registros: ppc.datos ? ppc.datos.meta.total : null,
+      error: ppc.error,
+      listo: Boolean(ppc.datos) && !ppc.error,
+      unidad: "intervenciones",
+    },
+    "defensa-civil": {
+      // El neto, no el total general: los asientos de apertura y cierre de
+      // guardia no son denuncias (ver dcReader.js).
+      registros: dc.datos ? dc.datos.meta.totalNeto : null,
+      error: dc.error,
+      listo: Boolean(dc.datos) && !dc.error,
+      unidad: "denuncias",
+    },
+  };
+  const areas = listarAreas(DATA_DIR).map((a) => ({
+    ...a,
+    ...(estados[a.id] || { registros: null, error: null, listo: false, unidad: null }),
+  }));
   res.json({ areas });
+});
+
+// --- Patrulla de Protección Ciudadana ---
+// Sin mapa: la base no trae domicilio ni coordenadas, solo totales por mes y
+// tipo de intervención (ver ppcReader.js).
+app.get("/api/ppc", (req, res) => {
+  if (ppc.error) return res.status(500).json({ error: ppc.error });
+  if (!ppc.datos) return res.status(404).json({ error: "No hay base de la PPC cargada" });
+  const filtros = {
+    tipo: req.query.tipo || null,
+    mesDesde: req.query.mesDesde || null,
+    mesHasta: req.query.mesHasta || null,
+  };
+  res.json({ ...PPC.resumenPPC(ppc.datos, filtros), loadedAt: ppc.loadedAt });
+});
+
+app.get("/api/ppc/options", (req, res) => {
+  if (ppc.error) return res.status(500).json({ error: ppc.error });
+  if (!ppc.datos) return res.status(404).json({ error: "No hay base de la PPC cargada" });
+  res.json(PPC.opcionesPPC(ppc.datos));
+});
+
+// --- Defensa Civil ---
+// Tampoco lleva mapa: la fuente es la hoja de resumen mensual, ya agregada.
+// `dimension` vale "categoria" u "organismo" y solo se puede elegir UNA: la
+// planilla no permite cruzar las dos matrices (ver dcReader.js).
+app.get("/api/dc", (req, res) => {
+  if (dc.error) return res.status(500).json({ error: dc.error });
+  if (!dc.datos) return res.status(404).json({ error: "No hay base de Defensa Civil cargada" });
+  const dimension = ["categoria", "organismo"].includes(req.query.dimension)
+    ? req.query.dimension
+    : null;
+  const filtros = {
+    dimension,
+    valor: (dimension && req.query.valor) || null,
+    mesDesde: req.query.mesDesde || null,
+    mesHasta: req.query.mesHasta || null,
+  };
+  res.json({ ...DC.resumenDC(dc.datos, filtros), loadedAt: dc.loadedAt });
+});
+
+app.get("/api/dc/options", (req, res) => {
+  if (dc.error) return res.status(500).json({ error: dc.error });
+  if (!dc.datos) return res.status(404).json({ error: "No hay base de Defensa Civil cargada" });
+  res.json(DC.opcionesDC(dc.datos));
 });
 
 app.get("/api/health", (req, res) => {

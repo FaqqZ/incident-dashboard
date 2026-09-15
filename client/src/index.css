@@ -191,6 +191,23 @@
   line-height: 1.1;
   margin-top: 8px;
   letter-spacing: -0.02em;
+  /* break-word y no anywhere: parte una palabra solo si no entra ni sola en el
+     renglón, en vez de partirla apenas conviene. El tamaño lo baja KpiCard. */
+  overflow-wrap: break-word;
+  hyphens: none;
+}
+
+/* El tamaño lo elige KpiCard según el largo del valor. */
+.kpi .value.largo {
+  font-size: 24px;
+  line-height: 1.18;
+  letter-spacing: -0.01em;
+}
+
+.kpi .value.muy-largo {
+  font-size: 19px;
+  line-height: 1.25;
+  letter-spacing: 0;
 }
 
 .kpi .hint {
@@ -1325,4 +1342,629 @@ a.area-card:hover {
 
 .area-card.deshabilitada .area-cta {
   color: var(--ink-3);
+}
+
+/* --- Áreas sin mapa (Patrulla y Defensa Civil) --- */
+/* Ninguna de las dos tiene mapa: sus bases llegan agregadas por mes. Estos
+   estilos son los de las piezas que lo reemplazan: mini gráficos con escala
+   propia, barra de proporción y tabla mes × tipo. */
+
+/* Mini gráficos: uno por tipo de intervención, cada uno con su propia escala */
+.minis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.mini {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 12px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, opacity 0.15s, transform 0.15s;
+}
+
+.mini:hover {
+  border-color: var(--color-4);
+  transform: translateY(-1px);
+}
+
+.mini:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Tipo no seleccionado: sigue visible y clickeable, pero atenuado. Misma
+   convención que las barras del gráfico de tipos. */
+.mini.apagado {
+  opacity: 0.38;
+}
+
+.mini-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.mini-tipo {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.mini-total {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-pie {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+/* Proporción entre despliegue preventivo y respuesta */
+.split-barra {
+  display: flex;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.split-prev { background: var(--graf-serie); }
+.split-resp { background: var(--graf-serie-2); }
+
+.split-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.split-punto {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.split-punto.prev { background: var(--graf-serie); }
+.split-punto.resp { background: var(--graf-serie-2); }
+
+/* Tabla mes × tipo. Scroll propio: con nueve tipos no entra en pantallas
+   angostas y el body NO tiene que scrollear en horizontal. */
+.tabla-scroll {
+  overflow-x: auto;
+}
+
+.tabla-matriz {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla-matriz th,
+.tabla-matriz td {
+  border: 1px solid var(--border);
+  padding: 7px 10px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tabla-matriz thead th {
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-weight: 600;
+  font-size: 12px;
+  vertical-align: bottom;
+}
+
+.tabla-matriz .col-mes {
+  text-align: left;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-weight: 600;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.tabla-matriz .col-total {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.tabla-matriz tfoot td,
+.tabla-matriz tfoot th {
+  background: var(--surface-2);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Mes pico de cada tipo: misma marca amarilla que en los mini gráficos */
+.tabla-matriz td.pico {
+  box-shadow: inset 0 0 0 2px var(--graf-max);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.tabla-matriz .cero {
+  color: var(--ink-3);
+}
+
+/* Encabezado de columna clickeable: elige ese tipo, igual que la barra */
+.th-boton {
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: right;
+  white-space: normal;
+  transition: color 0.15s;
+}
+
+.th-boton:hover { color: var(--color-4); }
+.th-boton.activo { color: var(--graf-max); }
+
+/* Escudo del área en su tarjeta del selector. Alto fijo y ancho automático:
+   el de la PPC es un escudo vertical y el de Defensa Civil un círculo, así que
+   no se les puede imponer la misma caja sin deformar alguno. */
+.area-marca {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+}
+
+.area-logo {
+  height: 58px;
+  width: auto;
+  max-width: 72px;
+  object-fit: contain;
+  display: block;
+  flex-shrink: 0;
+}
+
+/* La tarjeta sin base ya baja su opacidad entera; NO se le agrega grayscale al
+   escudo encima, porque el de Defensa Civil queda embarrado y no se le lee ni
+   el texto del anillo. */
+
+/* --- Encabezado: menú hamburguesa --- */
+/* Todas las vistas comparten la misma barra. Lo que cambia entre ellas son los
+   ítems, y van acá adentro: sueltos en la barra, el COMM llegaba a cinco
+   botones y se veía como otro sistema. */
+.topbar-acciones {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.menu-caja {
+  position: relative;
+}
+
+.menu-boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.menu-boton:hover,
+.menu-boton.abierto {
+  background: var(--surface-3);
+  color: var(--ink);
+  border-color: var(--color-4);
+}
+
+.menu-boton:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.menu-rayas {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 15px;
+  height: 11px;
+}
+
+.menu-rayas i {
+  display: block;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+/* El panel se ancla al botón y queda por encima del contenido. La barra es
+   sticky con z-index 1000, así que esto tiene que ir más arriba. */
+.menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1100;
+  min-width: 232px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  text-decoration: none;
+  padding: 10px 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.13s, color 0.13s;
+}
+
+.menu-item:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+
+.menu-item:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+/* La vista donde ya se está: se marca en vez de ofrecerla como destino. */
+.menu-item.actual {
+  color: var(--color-1);
+  font-weight: 600;
+}
+
+.menu-item-accion {
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.menu-item-accion:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.menu-separador {
+  height: 1px;
+  margin: 6px 8px;
+  background: var(--border);
+}
+
+/* --- Tarjetas de KPI: alineación entre tarjetas --- */
+/* Las etiquetas tienen largos distintos y algunas envuelven en dos renglones.
+   Sin una altura reservada, el valor de cada tarjeta arranca a distinta altura
+   y la fila se ve descalzada. */
+.kpi {
+  display: flex;
+  flex-direction: column;
+}
+
+.kpi .label {
+  min-height: 2.1em;
+  display: flex;
+  align-items: flex-start;
+}
+
+/* La ayuda se va al piso de la tarjeta: así queda a la misma altura en todas,
+   aunque el valor de arriba ocupe uno, dos o tres renglones. */
+.kpi .hint {
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+/* --- Torta de composición (Defensa Civil) --- */
+.torta {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(240px, 1fr);
+  gap: 18px;
+  align-items: center;
+}
+
+/* El contenedor es relativo para poder poner el total en el centro del anillo. */
+.torta-grafico {
+  position: relative;
+  min-width: 0;
+}
+
+.torta-centro {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none; /* no puede robarle el click a las porciones */
+  text-align: center;
+  max-width: 130px;
+}
+
+.torta-centro-valor {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.torta-centro-label {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.2;
+}
+
+.torta-leyenda {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.torta-leyenda li.apagada {
+  opacity: 0.42;
+}
+
+.torta-fila {
+  display: grid;
+  grid-template-columns: 11px 1fr auto auto;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  font-family: var(--font);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: background 0.13s, color 0.13s;
+}
+
+/* La porción "Otras" agrupa cosas distintas: no filtra, así que tampoco se
+   comporta como algo clickeable. */
+span.torta-fila {
+  cursor: default;
+}
+
+button.torta-fila:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+button.torta-fila:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+.torta-punto {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+.torta-nombre {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.torta-valor {
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.torta-pct {
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  min-width: 44px;
+  text-align: right;
+}
+
+@media (max-width: 1100px) {
+  /* Con el panel angosto la leyenda al costado deja el anillo diminuto. */
+  .torta {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Terminaciones de los gráficos --- */
+/* Los cambios de estado (filtrar, atenuar, señalar) pasaban de golpe. Las
+   transiciones van en CSS y NO en las animaciones de Recharts: esas se dejaron
+   apagadas a propósito, porque los puntos y las etiquetas de valor recién se
+   dibujan cuando la animación termina y quedaban invisibles. */
+.recharts-rectangle,
+.recharts-sector {
+  transition: fill-opacity 0.22s ease, filter 0.22s ease;
+}
+
+.recharts-bar-rectangle:hover .recharts-rectangle {
+  filter: brightness(1.14);
+}
+
+/* El eje señalado y la grilla, más discretos: los datos tienen que pesar más
+   que la cuadrícula. */
+.recharts-cartesian-axis-line,
+.recharts-cartesian-axis-tick-line {
+  stroke: var(--border);
+}
+
+.recharts-tooltip-cursor {
+  transition: opacity 0.15s ease;
+}
+
+/* La leyenda de Recharts (evolución apilada) */
+.recharts-legend-item {
+  cursor: default;
+}
+
+.recharts-legend-item-text {
+  color: var(--ink-2) !important;
+}
+
+/* --- Paneles y tarjetas --- */
+.panel {
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.panel:hover {
+  border-color: var(--surface-3);
+  box-shadow: var(--shadow);
+}
+
+.kpi {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.kpi:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: var(--surface-3);
+}
+
+/* La barra de acento pasa a degradé: plana se veía como un borde de más. */
+.kpi::before {
+  background: linear-gradient(
+    to bottom,
+    var(--accent, var(--brand)),
+    color-mix(in srgb, var(--accent, var(--brand)) 35%, transparent)
+  );
+}
+
+/* Entrada de los paneles: un desplazamiento corto al cargar la vista. Es lo
+   único que se mueve solo, y se apaga con prefers-reduced-motion más abajo. */
+@keyframes panel-entra {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.kpi-grid > .kpi,
+.charts-section > .panel,
+.charts-section > .charts-grid > .panel,
+.map-section > .panel {
+  animation: panel-entra 0.42s cubic-bezier(0.22, 0.68, 0.31, 1) both;
+}
+
+/* Escalonado: las tarjetas entran una detrás de otra en vez de todas juntas.
+   Se corta en la sexta para que la última no llegue tarde. */
+.kpi-grid > .kpi:nth-child(1) { animation-delay: 0.02s; }
+.kpi-grid > .kpi:nth-child(2) { animation-delay: 0.06s; }
+.kpi-grid > .kpi:nth-child(3) { animation-delay: 0.10s; }
+.kpi-grid > .kpi:nth-child(4) { animation-delay: 0.14s; }
+.kpi-grid > .kpi:nth-child(5) { animation-delay: 0.18s; }
+.kpi-grid > .kpi:nth-child(6) { animation-delay: 0.22s; }
+
+.charts-section > *:nth-child(1) { animation-delay: 0.04s; }
+.charts-section > *:nth-child(2) { animation-delay: 0.10s; }
+.charts-section > *:nth-child(3) { animation-delay: 0.16s; }
+.charts-section > *:nth-child(4) { animation-delay: 0.22s; }
+
+/* Las tarjetas del selector de área entran igual que los paneles. */
+.areas-grid > .area-card {
+  animation: panel-entra 0.42s cubic-bezier(0.22, 0.68, 0.31, 1) both;
+}
+
+.areas-grid > .area-card:nth-child(2) { animation-delay: 0.07s; }
+.areas-grid > .area-card:nth-child(3) { animation-delay: 0.14s; }
+
+/* El menú del encabezado se despliega en vez de aparecer de golpe. */
+@keyframes menu-baja {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.menu-panel {
+  animation: menu-baja 0.16s ease-out both;
+  transform-origin: top right;
+}
+
+/* Nada de esto es información: si el sistema pide menos movimiento, se apaga
+   todo y queda el estado final. */
+@media (prefers-reduced-motion: reduce) {
+  .kpi-grid > .kpi,
+  .charts-section > .panel,
+  .charts-section > .charts-grid > .panel,
+  .map-section > .panel,
+  .areas-grid > .area-card,
+  .menu-panel {
+    animation: none;
+  }
+  .kpi:hover {
+    transform: none;
+  }
+  a.area-card:hover {
+    transform: none;
+  }
+  .recharts-rectangle,
+  .recharts-sector,
+  .panel,
+  .kpi {
+    transition: none;
+  }
+}
+
+/* La sombra del anillo va por CSS y no por filtro SVG: así no depende de un
+   <defs> con id dinámico, que Recharts no deja pasar como prop del <Pie>. */
+.torta .recharts-pie {
+  filter: drop-shadow(0 3px 9px rgba(4, 16, 31, 0.55));
 }

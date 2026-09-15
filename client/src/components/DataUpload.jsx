@@ -3,27 +3,24 @@
 
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import TopBar from "./TopBar";
 import { fetchHealth } from "../api";
 import { useDataVersion } from "../store/useDataVersion";
 
 const nf = (n) => (n ?? 0).toLocaleString("es-AR");
 
 // Mismo membrete que el dashboard (versión negativa sobre el navy).
-function Topbar({ children }) {
-  return (
-    <header className="topbar">
-      <div className="brand">
-        <img
-          className="logo"
-          src="/logo-smt-negativo.png"
-          alt="Ciudad SMT · Subsecretaría de Seguridad Ciudadana"
-        />
-        <span className="brand-divider" aria-hidden="true" />
-        <h1>Gestión de Datos</h1>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>{children}</div>
-    </header>
-  );
+// El encabezado propio se reemplazó por el compartido, para que esta vista no
+// se vea distinta al resto. El menú es el mismo del COMM.
+const MENU_COMM = [
+  { to: "/comm", label: "Volver al tablero" },
+  { to: "/comm/analisis", label: "Análisis por categoría" },
+  { to: "/comm/siniestros-viales", label: "Siniestros viales" },
+  { to: "/", label: "Cambiar de área" },
+];
+
+function Topbar() {
+  return <TopBar titulo="Gestión de Datos" menu={MENU_COMM} />;
 }
 
 export default function DataUpload() {
@@ -256,9 +253,7 @@ export default function DataUpload() {
   if (!health) {
     return (
       <div className="app">
-        <Topbar>
-          <Link to="/comm" className="btn">Volver al dashboard</Link>
-        </Topbar>
+        <Topbar />
         <main className="canvas">
           <div className="state">
             <div className="spinner" />
@@ -272,9 +267,7 @@ export default function DataUpload() {
   if (!isAuthenticated && cargaHabilitada) {
     return (
       <div className="app">
-        <Topbar>
-          <Link to="/comm" className="btn">Volver al dashboard</Link>
-        </Topbar>
+        <Topbar />
 
         <main className="canvas">
           <div className="panel" style={{ maxWidth: "400px", margin: "40px auto" }}>

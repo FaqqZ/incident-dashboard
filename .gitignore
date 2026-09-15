@@ -11,6 +11,10 @@ dist/
 # del disco persistente y en local se siembra solo al arrancar. No se versiona.
 server/data/
 
-# server/seed/ SÍ se versiona: son los Excel que viajan en la imagen y siembran
-# el volumen la primera vez. Contienen incidentes reales de Seguridad Ciudadana,
-# así que este repositorio tiene que ser PRIVADO.
+# Los Excel de server/seed/ NO se versionan: el repositorio es público y traen
+# datos reales — direcciones de cámaras y, en Defensa Civil, nombre y domicilio
+# de cada denunciante. Viajan solo en el deploy por CLI (`vercel --prod`), que
+# se rige por .vercelignore y no por este archivo.
+# Ojo: incidentes.xlsx y siniestralidad.xlsx estuvieron versionados antes de
+# esta regla y siguen en el historial de git.
+server/seed/*.xlsx

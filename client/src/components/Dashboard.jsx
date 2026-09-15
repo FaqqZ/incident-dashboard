@@ -2,10 +2,10 @@
 // Extraído de App.jsx para permitir ruteo entre vistas
 
 import { useEffect, useState, useRef } from "react";
-import { Link } from "react-router-dom";
 import { fetchDashboard, fetchOptions } from "../api";
 import { useFilters } from "../store/useFilters";
 import { useDataVersion } from "../store/useDataVersion";
+import TopBar from "./TopBar";
 import FiltersBar from "./FiltersBar";
 import KpiCard from "./KpiCard";
 import CategoryBarChart from "./CategoryBarChart";
@@ -47,31 +47,19 @@ export default function Dashboard() {
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          {/* Versión negativa del membrete: el original tiene el texto en negro
-              y sobre el navy no se lee. logo-smt.png guarda el archivo intacto. */}
-          <img
-            className="logo"
-            src="/logo-smt-negativo.png"
-            alt="Ciudad SMT · Subsecretaría de Seguridad Ciudadana"
-          />
-          <span className="brand-divider" aria-hidden="true" />
-          <h1>Panel Operativo de Incidentes</h1>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          {data && <span className="updated">{nf(data.totalFiltrado)} incidentes en vista</span>}
-          <Link to="/" className="btn" style={{ fontSize: "12px" }}>Áreas</Link>
-          <Link to="/comm/analisis" className="btn" style={{ fontSize: "12px" }}>
-            Análisis por categoría
-          </Link>
-          <Link to="/comm/siniestros-viales" className="btn" style={{ fontSize: "12px" }}>
-            Siniestros viales
-          </Link>
-          <Link to="/comm/datos" className="btn" style={{ fontSize: "12px" }}>Gestión de datos</Link>
-          <ExportButton />
-        </div>
-      </header>
+      {/* Las cuatro secciones del COMM viven en el menú: sueltas en la barra
+          hacían que este tablero se viera distinto a los demás. */}
+      <TopBar
+        titulo="Panel Operativo de Incidentes"
+        resumen={data ? `${nf(data.totalFiltrado)} incidentes en vista` : null}
+        menu={[
+          { to: "/comm/analisis", label: "Análisis por categoría" },
+          { to: "/comm/siniestros-viales", label: "Siniestros viales" },
+          { to: "/comm/datos", label: "Gestión de datos" },
+          { to: "/", label: "Cambiar de área" },
+        ]}
+        acciones={<ExportButton className="menu-item menu-item-accion no-export" />}
+      />
 
       <main className="canvas">
         <FiltersBar options={options} />

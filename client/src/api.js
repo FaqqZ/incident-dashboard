@@ -64,6 +64,38 @@ export async function fetchAnalisisCategoria(categoria) {
   return res.json();
 }
 
+// --- Patrulla de Protección Ciudadana ---
+export async function fetchPPC(filtros) {
+  const res = await fetch(`/api/ppc${qs(filtros)}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Error ${res.status} al cargar los datos de la PPC`);
+  }
+  return res.json();
+}
+
+export async function fetchPPCOptions() {
+  const res = await fetch("/api/ppc/options");
+  if (!res.ok) throw new Error("No se pudieron cargar los filtros de la PPC");
+  return res.json();
+}
+
+// --- Defensa Civil ---
+export async function fetchDC(filtros) {
+  const res = await fetch(`/api/dc${qs(filtros)}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Error ${res.status} al cargar los datos de Defensa Civil`);
+  }
+  return res.json();
+}
+
+export async function fetchDCOptions() {
+  const res = await fetch("/api/dc/options");
+  if (!res.ok) throw new Error("No se pudieron cargar los filtros de Defensa Civil");
+  return res.json();
+}
+
 // --- Áreas (casos de estudio) de la Subsecretaría ---
 export async function fetchAreas() {
   const res = await fetch("/api/areas");

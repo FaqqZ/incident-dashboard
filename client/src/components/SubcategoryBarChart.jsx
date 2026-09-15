@@ -9,7 +9,9 @@ import {
 } from "recharts";
 import { useFilters } from "../store/useFilters";
 import { useNarrowScreen } from "../hooks/useNarrowScreen";
-import { TOOLTIP, indiceMaximo, colorSegunMaximo } from "../chartTheme";
+import {
+  TOOLTIP, indiceMaximo, rellenoBarra, useIdsGrafico, defsGrafico, urlDe,
+} from "../chartTheme";
 
 const nf = (v) => (v ?? 0).toLocaleString("es-AR");
 
@@ -20,6 +22,7 @@ const TOPE = 15;
 export default function SubcategoryBarChart({ data }) {
   const { filters, toggleFilter } = useFilters();
   const narrow = useNarrowScreen();
+  const ids = useIdsGrafico();
 
   if (!data || data.length === 0) {
     return <div className="state">Sin datos para el filtro actual.</div>;
@@ -35,7 +38,8 @@ export default function SubcategoryBarChart({ data }) {
     <>
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={visibles} layout="vertical" margin={{ left: 8, right: 64 }}>
-          <CartesianGrid horizontal={false} stroke="var(--border)" />
+          {defsGrafico(ids, { horizontal: true })}
+        <CartesianGrid horizontal={false} stroke="var(--border)" strokeDasharray="3 5" />
           <XAxis type="number" tick={{ fontSize: 12, fill: "var(--ink-3)" }} allowDecimals={false} />
           <YAxis
             type="category"
@@ -61,8 +65,9 @@ export default function SubcategoryBarChart({ data }) {
               return (
                 <Cell
                   key={entry.name}
-                  fill={colorSegunMaximo(i, idxMax)}
-                  fillOpacity={activa ? 1 : 0.28}
+                  fill={rellenoBarra(ids, i, idxMax)}
+                  fillOpacity={activa ? 1 : 0.26}
+                  filter={i === idxMax && activa ? urlDe(ids.brillo) : undefined}
                 />
               );
             })}

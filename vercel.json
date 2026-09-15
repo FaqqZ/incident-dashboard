@@ -4,7 +4,7 @@
   "outputDirectory": "client/dist",
   "functions": {
     "api/[...path].js": {
-      "includeFiles": "server/data/**",
+      "includeFiles": "{server/seed/**,server/data/**,client/public/logo-*.png}",
       "maxDuration": 30,
       "memory": 1024
     }

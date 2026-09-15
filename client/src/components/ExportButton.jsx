@@ -5,7 +5,11 @@ import { useState } from "react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 
-export default function ExportButton({ targetId = "export-area", filename }) {
+// `className` deja que el botón se adapte al lugar donde se lo pone: hoy vive
+// dentro del menú del encabezado y tiene que verse como un ítem más.
+export default function ExportButton({
+  targetId = "export-area", filename, className = "btn primary no-export",
+}) {
   const [busy, setBusy] = useState(false);
 
   async function exportPdf() {
@@ -49,7 +53,7 @@ export default function ExportButton({ targetId = "export-area", filename }) {
   }
 
   return (
-    <button className="btn primary no-export" onClick={exportPdf} disabled={busy}>
+    <button className={className} onClick={exportPdf} disabled={busy}>
       {busy ? "Generando…" : "Exportar PDF"}
     </button>
   );

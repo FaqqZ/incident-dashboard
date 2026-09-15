@@ -11,6 +11,23 @@
 const path = require("path");
 const fs = require("fs");
 
+// Dónde viven los assets del cliente. Se miran los dos porque en desarrollo los
+// sirve Vite desde public/ y en el host salen del build.
+const DIRS_PUBLICOS = [
+  path.join(__dirname, "..", "client", "public"),
+  process.env.CLIENT_DIST || path.join(__dirname, "..", "client", "dist"),
+];
+
+// El escudo de cada área se informa solo si el archivo existe de verdad. Así
+// alcanza con dejar el PNG en client/public/ para que aparezca, igual que pasa
+// con el Excel, y mientras tanto la tarjeta usa la sigla sin pedir un 404.
+function rutaLogo(archivo) {
+  if (!archivo) return null;
+  return DIRS_PUBLICOS.some((d) => fs.existsSync(path.join(d, archivo)))
+    ? `/${archivo}`
+    : null;
+}
+
 const AREAS = [
   {
     id: "comm",
@@ -28,16 +45,20 @@ const AREAS = [
     sigla: "DC",
     nombre: "Defensa Civil",
     descripcion:
-      "Intervenciones de Defensa Civil. Pendiente de recibir la base de datos.",
+      "Denuncias del libro de guardia por categoría y organismo derivado. " +
+      "La fuente es el resumen mensual, ya agregado, así que no lleva mapa.",
     archivo: "defensa-civil.xlsx",
+    logoArchivo: "logo-dc.png",
   },
   {
     id: "ppc",
     sigla: "PPC",
     nombre: "Patrulla de Protección Ciudadana",
     descripcion:
-      "Operativos y despachos de la Patrulla. Pendiente de recibir la base de datos.",
+      "Intervenciones de la Patrulla por tipo y por mes. La base viene agregada " +
+      "(sin domicilio ni coordenadas), así que esta vista no lleva mapa.",
     archivo: "ppc.xlsx",
+    logoArchivo: "logo-ppc.png",
   },
 ];
 
@@ -51,6 +72,7 @@ function listarAreas(dataDir) {
       sigla: a.sigla,
       nombre: a.nombre,
       descripcion: a.descripcion,
+      logo: rutaLogo(a.logoArchivo),
       disponible: existe,
       archivo: a.archivo,
       // Solo informativo para la vista de gestión de datos.

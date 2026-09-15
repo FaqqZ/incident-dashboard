@@ -10,13 +10,13 @@
 // dibujar algo incorrecto.
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Cell, LabelList,
 } from "recharts";
 import { fetchAnalisisCategoria, fetchOptions } from "../api";
 import RecurrenciaMap, { COLOR_HEX, COLOR_MAXIMO, ETIQUETAS_GENERICAS } from "./RecurrenciaMap";
+import TopBar from "./TopBar";
 import KpiCard from "./KpiCard";
 import { SERIE, MAXIMO, TOOLTIP, indiceMaximo, colorSegunMaximo, dotMaximo } from "../chartTheme";
 
@@ -55,20 +55,15 @@ export default function AnalisisCategoria() {
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <img className="logo" src="/logo-smt-negativo.png"
-            alt="Ciudad SMT · Subsecretaría de Seguridad Ciudadana" />
-          <span className="brand-divider" aria-hidden="true" />
-          <h1>Análisis por categoría</h1>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <Link to="/comm/siniestros-viales" className="btn" style={{ fontSize: "12px" }}>
-            Siniestros viales
-          </Link>
-          <Link to="/comm" className="btn">Volver al tablero</Link>
-        </div>
-      </header>
+      <TopBar
+        titulo="Análisis por categoría"
+        menu={[
+          { to: "/comm", label: "Volver al tablero" },
+          { to: "/comm/siniestros-viales", label: "Siniestros viales" },
+          { to: "/comm/datos", label: "Gestión de datos" },
+          { to: "/", label: "Cambiar de área" },
+        ]}
+      />
 
       <main className="canvas vista-siniestros">
         <div className="filters">
