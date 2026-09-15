@@ -1,21 +1,20 @@
 // EvolucionApilada.jsx — evolución mes a mes de las categorías de Defensa Civil.
 //
-// Arranca mostrando SOLO la categoría principal del período (o la elegida en el
-// filtro): su evolución mes a mes, con el valor de cada mes y el mes pico en
-// amarillo. Con las seis categorías apiladas de entrada no se podía seguir
-// ninguna: la franja de cada una quedaba montada sobre las otras y su pico no
-// se leía.
+// Un selector con TODAS las categorías (ordenadas por volumen) elige cuál se
+// estudia: se ve su evolución mes a mes, con el valor de cada mes y el mes pico
+// en amarillo. Arranca con la categoría principal del período, o con la elegida
+// en los filtros del tablero.
 //
-// Tocando otras categorías se suman al gráfico, apiladas: ahí el borde de
-// arriba es el total de las activas y cada franja es lo que aportó cada una.
-// Siempre queda al menos una activa.
+// Antes eran botones solo para las seis más grandes más "Otras": una categoría
+// chica no se podía mirar sola. El selector las ofrece a todas.
 //
-// Se ofrecen las de mayor volumen y el resto se junta en "Otras": con veintiuna
-// no se distinguiría ninguna.
+// La última opción, "Todas, apiladas", muestra la composición del total: las
+// seis principales y el resto agrupado en "Otras" (con veintiuna franjas no se
+// distinguiría ninguna).
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList,
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList, Legend,
 } from "recharts";
 import {
   SERIE, MAXIMO, TOOLTIP, indiceMaximo, dotMaximo, useIdsGrafico, defsGrafico, urlDe,
@@ -30,32 +29,24 @@ const PALETA = [
   "var(--c6)", "var(--c1)", "var(--c8)", "var(--c5)",
 ];
 const OTRAS = "var(--ink-3)";
-const CLAVE_OTRAS = "__otras";
+const TODAS = "__todas";
 
 export default function EvolucionApilada({ series, tope = 6, seleccionado = "" }) {
   const ids = useIdsGrafico();
+  const idSelect = useId();
   const principal = series?.[0]?.tipo || "";
   const inicial = seleccionado || principal;
-  const [activas, setActivas] = useState(() => (inicial ? [inicial] : []));
+  const [elegida, setElegida] = useState(inicial);
 
-  // Cambió la categoría elegida en el filtro, o el período movió cuál es la
+  // Cambió la categoría elegida en los filtros, o el período movió cuál es la
   // principal: se vuelve a arrancar desde esa.
   useEffect(() => {
-    setActivas(inicial ? [inicial] : []);
+    setElegida(inicial);
   }, [inicial]);
 
   if (!series || series.length === 0) {
     return <div className="state">Sin datos para el rango elegido.</div>;
   }
-
-  // Si la categoría elegida quedó fuera de las principales, se la ofrece igual:
-  // si no, elegirla en el filtro no cambiaría nada en este gráfico.
-  let visibles = series.slice(0, tope);
-  if (seleccionado && !visibles.some((s) => s.tipo === seleccionado)) {
-    const elegida = series.find((s) => s.tipo === seleccionado);
-    if (elegida) visibles = [...visibles, elegida];
-  }
-  const cola = series.filter((s) => !visibles.includes(s));
 
   const meses = series[0].puntos.map((p) => p.name);
   // Total de TODAS las categorías en cada mes, para decir qué parte del mes
@@ -63,107 +54,55 @@ export default function EvolucionApilada({ series, tope = 6, seleccionado = "" }
   const totalMes = meses.map((_, i) => series.reduce((acc, s) => acc + (s.puntos[i]?.value || 0), 0));
   const totalPeriodo = totalMes.reduce((a, b) => a + b, 0);
 
-  // dataKey por posición y no por nombre: Recharts lee el dataKey como una ruta
-  // con puntos, y hay etiquetas como "Sin señalizar." que la romperían.
-  const capas = [
-    ...visibles.map((s, i) => ({
-      clave: s.tipo,
-      dk: `s${i}`,
-      nombre: s.tipo,
-      total: s.total,
-      color: i === 0 ? MAXIMO : PALETA[i % PALETA.length],
-      valores: s.puntos.map((p) => p.value || 0),
-    })),
-    ...(cola.length
-      ? [{
-          clave: CLAVE_OTRAS,
-          dk: "otras",
-          nombre: `Otras (${cola.length})`,
-          total: cola.reduce((acc, s) => acc + s.total, 0),
-          color: OTRAS,
-          valores: meses.map((_, i) => cola.reduce((acc, s) => acc + (s.puntos[i]?.value || 0), 0)),
-        }]
-      : []),
-  ];
+  const vistaTodas = elegida === TODAS;
+  // Si la categoría guardada ya no está en el período, se vuelve a la principal.
+  const serie = vistaTodas ? null : series.find((s) => s.tipo === elegida) || series[0];
 
-  const existe = (clave) => capas.some((c) => c.clave === clave);
-  const enUso = activas.filter(existe).length ? activas.filter(existe) : [capas[0].clave];
-  const capasActivas = capas.filter((c) => enUso.includes(c.clave));
-  const sola = capasActivas.length === 1 ? capasActivas[0] : null;
+  const selector = (
+    <div className="field evol-campo">
+      <label htmlFor={idSelect}>Categoría a estudiar</label>
+      <select
+        id={idSelect}
+        value={vistaTodas ? TODAS : serie.tipo}
+        onChange={(e) => setElegida(e.target.value)}
+      >
+        {series.map((s, i) => (
+          <option key={s.tipo} value={s.tipo}>
+            {s.tipo} · {nf(s.total)}{i === 0 ? " (principal)" : ""}
+          </option>
+        ))}
+        <option value={TODAS}>Todas, apiladas (composición del total)</option>
+      </select>
+    </div>
+  );
 
-  const datos = meses.map((mes, i) => {
-    const fila = { mes: cap(mes), value: sola ? sola.valores[i] : 0 };
-    capasActivas.forEach((c) => { fila[c.dk] = c.valores[i]; });
-    return fila;
-  });
+  // --- Una categoría -------------------------------------------------------
+  if (!vistaTodas) {
+    const datos = meses.map((mes, i) => ({ mes: cap(mes), value: serie.puntos[i]?.value || 0 }));
+    const idxMax = indiceMaximo(datos);
+    const pico = idxMax >= 0
+      ? {
+          mes: datos[idxMax].mes,
+          valor: datos[idxMax].value,
+          pctDelMes: totalMes[idxMax] ? (datos[idxMax].value / totalMes[idxMax]) * 100 : 0,
+        }
+      : null;
 
-  const alternar = (clave) =>
-    setActivas((prev) => {
-      const actuales = prev.filter(existe).length ? prev.filter(existe) : [capas[0].clave];
-      if (!actuales.includes(clave)) return [...actuales, clave];
-      // La última activa no se apaga: un gráfico vacío no dice nada.
-      return actuales.length === 1 ? actuales : actuales.filter((c) => c !== clave);
-    });
+    return (
+      <>
+        {selector}
 
-  const reiniciar = () => setActivas([existe(inicial) ? inicial : capas[0].clave]);
-
-  const idxMax = sola ? indiceMaximo(datos) : -1;
-  const pico = idxMax >= 0
-    ? {
-        mes: datos[idxMax].mes,
-        valor: datos[idxMax].value,
-        pctDelMes: totalMes[idxMax] ? (datos[idxMax].value / totalMes[idxMax]) * 100 : 0,
-      }
-    : null;
-  const sumaActivas = capasActivas.reduce((acc, c) => acc + c.total, 0);
-
-  return (
-    <>
-      <div className="evol-chips" role="group" aria-label="Categorías que muestra el gráfico">
-        {capas.map((c) => {
-          const activa = enUso.includes(c.clave);
-          // Con una sola activa el área va en azul (el amarillo queda para su
-          // mes pico): el punto del botón acompaña ese color.
-          const punto = sola && sola.clave === c.clave ? SERIE : c.color;
-          return (
-            <button
-              key={c.clave}
-              type="button"
-              className={`evol-chip${activa ? " activa" : ""}`}
-              aria-pressed={activa}
-              onClick={() => alternar(c.clave)}
-              title={activa && enUso.length === 1 ? "Tiene que quedar al menos una categoría" : undefined}
-            >
-              <i style={{ background: punto }} />
-              <span>{c.nombre}</span>
-              <b>{nf(c.total)}</b>
-            </button>
-          );
-        })}
-        {enUso.length > 1 ? (
-          <button type="button" className="evol-accion" onClick={reiniciar}>
-            {seleccionado ? "Solo la elegida" : "Solo la principal"}
-          </button>
-        ) : (
-          <button type="button" className="evol-accion" onClick={() => setActivas(capas.map((c) => c.clave))}>
-            Sumar todas
-          </button>
-        )}
-      </div>
-
-      <ResponsiveContainer width="100%" height={340}>
-        <AreaChart data={datos} margin={{ left: -12, right: 24, top: sola ? 28 : 10 }}>
-          {defsGrafico(ids, { colores: capasActivas.map((c) => c.color) })}
-          <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 5" />
-          <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "var(--ink-3)" }} />
-          <YAxis tick={{ fontSize: 12, fill: "var(--ink-3)" }} allowDecimals={false} />
-          <Tooltip {...TOOLTIP} formatter={(v, n) => [nf(v), n]} />
-          {sola ? (
+        <ResponsiveContainer width="100%" height={320}>
+          <AreaChart data={datos} margin={{ left: -12, right: 24, top: 28 }}>
+            {defsGrafico(ids)}
+            <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 5" />
+            <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "var(--ink-3)" }} />
+            <YAxis tick={{ fontSize: 12, fill: "var(--ink-3)" }} allowDecimals={false} />
+            <Tooltip {...TOOLTIP} formatter={(v) => [nf(v), serie.tipo]} />
             <Area
-              key={sola.clave}
               type="monotone"
               dataKey="value"
-              name={sola.nombre}
+              name={serie.tipo}
               stroke={SERIE}
               strokeWidth={2.5}
               fill={urlDe(ids.area)}
@@ -189,47 +128,87 @@ export default function EvolucionApilada({ series, tope = 6, seleccionado = "" }
                 )}
               />
             </Area>
+          </AreaChart>
+        </ResponsiveContainer>
+
+        <p className="evol-resumen">
+          <b>{serie.tipo}</b>: {nf(serie.total)} denuncias, el{" "}
+          {nf(totalPeriodo ? (serie.total / totalPeriodo) * 100 : 0, 1)}% del período.{" "}
+          {pico ? (
+            <>
+              Mes pico: <b style={{ color: MAXIMO }}>{pico.mes}</b>, con {nf(pico.valor)} —
+              el {nf(pico.pctDelMes, 1)}% de todas las denuncias de ese mes.
+            </>
           ) : (
-            // Recharts apila en el orden en que se declaran: la categoría más
-            // grande abajo, apoyada en el eje, y "Otras" arriba.
-            capasActivas.map((c, i) => (
-              <Area
-                key={c.clave}
-                type="monotone"
-                dataKey={c.dk}
-                name={c.nombre}
-                stackId="total"
-                stroke={c.color}
-                strokeWidth={1.5}
-                fill={urlDe(`${ids.capa}-${i}`)}
-                isAnimationActive={false}
-                activeDot={{ r: 4, stroke: "var(--surface)", strokeWidth: 1.5 }}
-              />
-            ))
+            "No tiene un mes que se destaque sobre los demás."
           )}
+        </p>
+      </>
+    );
+  }
+
+  // --- Todas, apiladas ------------------------------------------------------
+  const visibles = series.slice(0, tope);
+  const cola = series.slice(tope);
+  // dataKey por posición y no por nombre: Recharts lee el dataKey como una ruta
+  // con puntos, y hay etiquetas como "Sin señalizar." que la romperían.
+  const capas = [
+    ...visibles.map((s, i) => ({
+      dk: `s${i}`,
+      nombre: s.tipo,
+      color: i === 0 ? MAXIMO : PALETA[i % PALETA.length],
+      valores: s.puntos.map((p) => p.value || 0),
+    })),
+    ...(cola.length
+      ? [{
+          dk: "otras",
+          nombre: `Otras (${cola.length})`,
+          color: OTRAS,
+          valores: meses.map((_, i) => cola.reduce((acc, s) => acc + (s.puntos[i]?.value || 0), 0)),
+        }]
+      : []),
+  ];
+  const datos = meses.map((mes, i) => {
+    const fila = { mes: cap(mes) };
+    capas.forEach((c) => { fila[c.dk] = c.valores[i]; });
+    return fila;
+  });
+
+  return (
+    <>
+      {selector}
+
+      <ResponsiveContainer width="100%" height={360}>
+        <AreaChart data={datos} margin={{ left: -12, right: 16, top: 10 }}>
+          {defsGrafico(ids, { colores: capas.map((c) => c.color) })}
+          <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 5" />
+          <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "var(--ink-3)" }} />
+          <YAxis tick={{ fontSize: 12, fill: "var(--ink-3)" }} allowDecimals={false} />
+          <Tooltip {...TOOLTIP} formatter={(v, n) => [nf(v), n]} />
+          <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} iconType="circle" iconSize={9} />
+          {/* Recharts apila en el orden en que se declaran: la categoría más
+              grande abajo, apoyada en el eje, y "Otras" arriba. */}
+          {capas.map((c, i) => (
+            <Area
+              key={c.dk}
+              type="monotone"
+              dataKey={c.dk}
+              name={c.nombre}
+              stackId="total"
+              stroke={c.color}
+              strokeWidth={1.5}
+              fill={urlDe(`${ids.capa}-${i}`)}
+              isAnimationActive={false}
+              activeDot={{ r: 4, stroke: "var(--surface)", strokeWidth: 1.5 }}
+            />
+          ))}
         </AreaChart>
       </ResponsiveContainer>
 
       <p className="evol-resumen">
-        {sola ? (
-          pico ? (
-            <>
-              Mes pico de <b>{sola.nombre}</b>:{" "}
-              <b style={{ color: MAXIMO }}>{pico.mes}</b>, con {nf(pico.valor)} denuncias —
-              el {nf(pico.pctDelMes, 1)}% de todas las denuncias de ese mes.
-            </>
-          ) : (
-            <>
-              <b>{sola.nombre}</b> no tiene un mes que se destaque sobre los demás.
-            </>
-          )
-        ) : (
-          <>
-            {capasActivas.length} categorías activas: suman {nf(sumaActivas)} denuncias, el{" "}
-            {nf(totalPeriodo ? (sumaActivas / totalPeriodo) * 100 : 0, 1)}% del período. El borde de
-            arriba es el total de las activas y cada franja, lo que aportó cada una.
-          </>
-        )}
+        Las {visibles.length} categorías principales{cola.length ? ` y ${cola.length} más agrupadas en “Otras”` : ""}.
+        El borde de arriba es el total de denuncias de cada mes y cada franja, lo que aportó cada
+        categoría.
       </p>
     </>
   );

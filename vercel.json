@@ -5,7 +5,7 @@
   "functions": {
     "api/index.js": {
       "includeFiles": "{server/seed/**,server/data/**,client/public/logo-*.png}",
-      "maxDuration": 30,
+      "maxDuration": 60,
       "memory": 1024
     }
   },

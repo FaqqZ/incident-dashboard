@@ -1998,85 +1998,16 @@ button.torta-fila:focus-visible {
 }
 
 /* --- Evolución de la composición (Defensa Civil) --------------------------
-   Botones para prender y apagar categorías. Arranca con una sola —la
-   principal— y se suman las demás tocándolas. */
-.evol-chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
+   Selector con todas las categorías: el campo usa el mismo estilo que los
+   filtros del tablero, así se lee como un control más y no como otro sistema. */
+.evol-campo {
+  max-width: 420px;
   margin-bottom: 14px;
 }
 
-.evol-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  max-width: 100%;
-  padding: 5px 11px 5px 9px;
-  font-family: var(--font);
-  font-size: 12px;
-  color: var(--ink-3);
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+.evol-campo select {
+  width: 100%;
 }
-
-.evol-chip span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 26ch;
-}
-
-.evol-chip i {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  opacity: 0.45;
-}
-
-.evol-chip b {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-3);
-}
-
-.evol-chip:hover {
-  border-color: var(--color-4);
-  color: var(--ink-2);
-}
-
-.evol-chip.activa {
-  color: var(--ink);
-  background: var(--surface-2);
-  border-color: var(--surface-3);
-}
-
-.evol-chip.activa i { opacity: 1; }
-.evol-chip.activa b { color: var(--ink-2); }
-
-.evol-chip:focus-visible,
-.evol-accion:focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 2px;
-}
-
-.evol-accion {
-  font-family: var(--font);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-4);
-  background: transparent;
-  border: none;
-  padding: 5px 6px;
-  cursor: pointer;
-}
-
-.evol-accion:hover { text-decoration: underline; }
 
 .evol-resumen {
   margin: 10px 0 0;
