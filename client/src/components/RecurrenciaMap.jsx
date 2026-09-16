@@ -8,9 +8,12 @@
 //     de la clase de recurrencia (§7).
 //   · El tooltip muestra los ocho campos pedidos (§6).
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
+import {
+  CapasEnMapa, SelectorCapas, contiene, useCapas, useResumenes,
+} from "./CapasTerritoriales";
 
 const CENTRO = [-26.8241, -65.2226];
 const ZOOM = 13;
@@ -43,9 +46,12 @@ function estiloPunto(p) {
 const nf = (n, d = 0) =>
   (n ?? 0).toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
 
-function AjustarVista({ puntos }) {
+// Con un polígono elegido no reencuadra: el clic ya acercó a ese polígono.
+// Al soltarlo, `enFoco` pasa a false y la vista vuelve a todos los puntos.
+function AjustarVista({ puntos, enFoco }) {
   const map = useMap();
   useEffect(() => {
+    if (enFoco) return;
     const conCoords = puntos.filter((p) => p.lat !== null && p.lng !== null);
     if (!conCoords.length) return;
     const el = map.getContainer();
@@ -55,7 +61,7 @@ function AjustarVista({ puntos }) {
       padding: [30, 30],
       maxZoom: 15,
     });
-  }, [map, puntos]);
+  }, [map, puntos, enFoco]);
   return null;
 }
 
@@ -144,11 +150,38 @@ export default function RecurrenciaMap({ puntos, etiquetas }) {
     };
   }, [pantallaCompleta]);
 
-  const ubicables = puntos.filter((p) => p.lat !== null && p.lng !== null);
+  // Memorizado: AjustarVista reencuadra cada vez que cambia este array, y sin
+  // memo cambiaba en cada render (por ejemplo, al prender una capa).
+  const ubicables = useMemo(
+    () => puntos.filter((p) => p.lat !== null && p.lng !== null),
+    [puntos]
+  );
+
+  // Capas territoriales y filtro por polígono (clic sobre un distrito,
+  // circuito o barrio).
+  const { activas, datos, alternar } = useCapas();
+  const resumenes = useResumenes(datos, activas, ubicables);
+  const [foco, setFoco] = useState(null);
+  // Si se apaga la capa del polígono elegido, el filtro deja de tener sentido.
+  const focoVigente = foco && activas.includes(foco.clave) ? foco : null;
+  const visibles = useMemo(
+    () => (focoVigente ? ubicables.filter((p) => contiene(focoVigente.feature, p)) : ubicables),
+    [ubicables, focoVigente]
+  );
+  const resumenFoco = {
+    puntos: visibles.length,
+    total: visibles.reduce((acc, p) => acc + (p.svAcumulados || 0), 0),
+  };
+  const elegirFoco = (clave, feature) =>
+    setFoco((f) =>
+      f && f.clave === clave && f.i === feature.properties._i
+        ? null // segundo clic sobre el mismo: se suelta
+        : { clave, i: feature.properties._i, feature, nombre: feature.properties.nombre || "Sin nombre" }
+    );
 
   // Los que tienen señal se dibujan ÚLTIMOS para que queden por encima de los
   // grises y no se pierdan detrás de ellos.
-  const ordenados = [...ubicables].sort((a, b) => {
+  const ordenados = [...visibles].sort((a, b) => {
     const peso = (p) => (p.color === "SIN SEÑAL" ? 0 : 1);
     return peso(a) - peso(b);
   });
@@ -156,7 +189,8 @@ export default function RecurrenciaMap({ puntos, etiquetas }) {
   // El dispositivo con más incidentes se señala con un anillo amarillo. El
   // color de relleno NO se toca: sigue siendo el de su clase, como exige el §5.
   // El §7 avala justamente esto: un marcador adicional en vez de otro color.
-  const maximo = ubicables.reduce(
+  // Con un polígono elegido, el máximo es el de esa zona.
+  const maximo = visibles.reduce(
     (mejor, p) => (!mejor || p.svAcumulados > mejor.svAcumulados ? p : mejor),
     null
   );
@@ -193,6 +227,16 @@ export default function RecurrenciaMap({ puntos, etiquetas }) {
         </button>
       </div>
 
+      <SelectorCapas
+        activas={activas}
+        datos={datos}
+        alternar={alternar}
+        foco={focoVigente}
+        onQuitarFoco={() => setFoco(null)}
+        resumenFoco={resumenFoco}
+        etiquetaTotal={textos.acumulados}
+      />
+
       <div className="map-shell">
         <MapContainer center={CENTRO} zoom={ZOOM} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
           <TileLayer
@@ -203,8 +247,16 @@ export default function RecurrenciaMap({ puntos, etiquetas }) {
             url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
             maxZoom={19}
           />
-          <AjustarVista puntos={ubicables} />
+          <AjustarVista puntos={ubicables} enFoco={Boolean(focoVigente)} />
           <Redimensionar />
+          <CapasEnMapa
+            activas={activas}
+            datos={datos}
+            resumenes={resumenes}
+            foco={focoVigente}
+            onFoco={elegirFoco}
+            etiquetaTotal={textos.acumulados}
+          />
 
           {ordenados.map((p) => {
             const estilo = estiloPunto(p);

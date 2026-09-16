@@ -115,6 +115,38 @@ cálculo: con `naturaleza=Seguridad` todos los valores históricos coinciden al
 dígito (ver Validación). Si el objetivo es replicar el Power BI, hay que
 arrancar con ese filtro puesto (`EMPTY` en `store/useFilters.js`).
 
+## Capas territoriales del mapa (COMM)
+El mapa de puntos (`RecurrenciaMap.jsx`, usado en `/comm`, en el análisis por
+categoría y en siniestros viales) tiene tres capas opcionales:
+**Distritos** (20), **Circuitos electorales** (47) y **Barrios y zonas** (362).
+Lógica en `CapasTerritoriales.jsx`.
+
+- Arrancan apagadas; cada una se prende con su botón en la barra del mapa y la
+  elección se recuerda en el navegador (`localStorage`, clave
+  `comm.capasActivas`). Los GeoJSON se piden recién al prenderlas.
+- **Clic en un polígono = filtro**: el mapa muestra solo los puntos que caen
+  adentro (punto-en-polígono con la ubicación de la cámara) y el máximo pasa a
+  ser el de esa zona. Segundo clic o la × lo sueltan. Filtra SOLO el mapa: los
+  KPI y gráficos de la vista no cambian.
+- Con varias capas prendidas, solo la más fina lleva relleno; las otras quedan
+  como contorno (si no, el relleno del distrito tapaba el clic a los barrios).
+- Van en panes propios con z-index 360–380, debajo de los puntos (400).
+
+Los archivos servidos están en `client/public/capas/` y salen de:
+
+```bash
+node scripts/convertirCapas.js "DISTRITOS PP CORREGIDO.geojson" circuitos_electorales_2027.geojson Barrios_y_Zonas_2026_AUDITADO.geojson
+```
+
+⚠️ Circuitos y barrios llegaron en **EPSG:5345** (POSGAR 2007 / Argentina
+faja 3, en metros); Leaflet necesita lat/lng. El script los reproyecta (sin
+dependencias), aplana los `GeometryCollection`, redondea a 6 decimales y deja
+solo los campos del tooltip. Distritos ya venía en CRS84. Verificación hecha
+al convertir: los 241 barrios que la auditoría asigna 100% a un distrito caen
+dentro de ese distrito, y los 222 asignados 100% a un circuito, dentro del
+suyo. Con la base actual, 481 de las 485 cámaras caen en algún distrito
+(Distrito 10, el centro, tiene 337).
+
 ## Correcciones de Power Query implementadas (excelReader.js)
 - Filtrar dispositivo vacío/nulo en la hoja de incidentes.
 - fecha → tipo fecha; columnas mes (nombre español), mesnro (orden ene→jul),

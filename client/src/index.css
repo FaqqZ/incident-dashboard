@@ -2204,3 +2204,115 @@ button.torta-fila:focus-visible {
 .tabla-participacion tr.fila-resto .col-periodo {
   color: var(--ink-3);
 }
+
+/* --- Capas territoriales del mapa (distritos, circuitos, barrios) --- */
+.map-capas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+.map-capas-titulo {
+  font-weight: 600;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+  margin-right: 2px;
+}
+
+.capa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 12px 5px 9px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.capa-chip:hover {
+  border-color: var(--ink-3);
+}
+
+.capa-chip.on {
+  background: var(--surface-2);
+  border-color: var(--ink-3);
+  color: var(--ink);
+}
+
+.capa-muestra {
+  width: 14px;
+  height: 10px;
+  border: 2px solid;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.capa-n {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.capa-error {
+  color: var(--err-ink);
+}
+
+.map-capas-ayuda {
+  color: var(--ink-3);
+  margin-left: 4px;
+}
+
+/* Filtro por polígono activo: se lee como una ficha que se puede cerrar */
+.capa-foco {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 4px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 999px;
+  background: var(--brand-100);
+  color: var(--ink);
+}
+
+.capa-foco b {
+  font-weight: 700;
+}
+
+.capa-foco button {
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 16px;
+  line-height: 1;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.capa-foco button:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.tooltip-recurrencia .capa-tt-sub {
+  color: #5b6878;
+  font-size: 11px;
+}
+
+/* El navegador marca con un recuadro el polígono clickeado (foco del SVG).
+   El polígono elegido ya se resalta con su propio estilo. */
+.leaflet-container path.leaflet-interactive:focus {
+  outline: none;
+}
