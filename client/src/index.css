@@ -2273,7 +2273,73 @@ button.torta-fila:focus-visible {
   margin-left: 4px;
 }
 
-/* Filtro por polígono activo: se lee como una ficha que se puede cerrar */
+.map-territorio {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.map-territorio .map-capas {
+  margin-bottom: 0;
+}
+
+/* Desplegable de filtro territorial: rótulo y select en una misma cápsula,
+   con el color de su capa cuando tiene un valor elegido. */
+.capa-filtro {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 4px 2px 12px;
+  background: transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.capa-filtro > span {
+  color: var(--ink-3);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.capa-filtro select {
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: none;
+  border-radius: 999px;
+  padding: 4px 8px;
+  max-width: 220px;
+  cursor: pointer;
+  outline: none;
+}
+
+.capa-filtro select:focus-visible {
+  box-shadow: 0 0 0 2px var(--brand-100);
+}
+
+/* Punto con el color de la capa: liga el filtro con su trazo en el mapa. */
+.capa-filtro::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--capa);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55);
+  flex-shrink: 0;
+}
+
+/* Con un valor elegido la cápsula se enciende. El borde va en tinta clara y
+   no en el color de la capa: el azul de distritos no se ve sobre el navy. */
+.capa-filtro.on {
+  border-color: var(--ink-2);
+  background: var(--surface-2);
+}
+
+/* Filtro territorial activo: se lee como una ficha que se puede cerrar */
 .capa-foco {
   display: inline-flex;
   align-items: center;

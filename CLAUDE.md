@@ -124,10 +124,16 @@ Lógica en `CapasTerritoriales.jsx`.
 - Arrancan apagadas; cada una se prende con su botón en la barra del mapa y la
   elección se recuerda en el navegador (`localStorage`, clave
   `comm.capasActivas`). Los GeoJSON se piden recién al prenderlas.
-- **Clic en un polígono = filtro**: el mapa muestra solo los puntos que caen
-  adentro (punto-en-polígono con la ubicación de la cámara) y el máximo pasa a
-  ser el de esa zona. Segundo clic o la × lo sueltan. Filtra SOLO el mapa: los
-  KPI y gráficos de la vista no cambian.
+- **Filtros por distrito, circuito y barrio**: un desplegable por capa en la
+  fila "Filtrar", y el clic sobre un polígono elige ese mismo valor (segundo
+  clic lo suelta). Se COMBINAN: quedan los puntos que caen dentro de todos los
+  polígonos elegidos (punto-en-polígono con la ubicación de la cámara) y el
+  máximo pasa a ser el de esa zona. Elegir un valor prende su capa; apagar la
+  capa suelta su filtro. La lista de barrios se acota al distrito/circuito
+  elegido (según la asignación de la auditoría) y, si el barrio elegido no
+  pertenece al distrito o circuito nuevo, se suelta. Las listas se piden al
+  tocar el desplegable. Filtra SOLO el mapa: los KPI y gráficos de la vista no
+  cambian.
 - Con varias capas prendidas, solo la más fina lleva relleno; las otras quedan
   como contorno (si no, el relleno del distrito tapaba el clic a los barrios).
 - Van en panes propios con z-index 360–380, debajo de los puntos (400).

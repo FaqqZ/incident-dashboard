@@ -46,8 +46,8 @@ function estiloPunto(p) {
 const nf = (n, d = 0) =>
   (n ?? 0).toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
 
-// Con un polígono elegido no reencuadra: el clic ya acercó a ese polígono.
-// Al soltarlo, `enFoco` pasa a false y la vista vuelve a todos los puntos.
+// Con un filtro territorial no reencuadra: EncuadrarSeleccion ya acercó a esa
+// zona. Al soltarlo, `enFoco` pasa a false y la vista vuelve a todos los puntos.
 function AjustarVista({ puntos, enFoco }) {
   const map = useMap();
   useEffect(() => {
@@ -157,27 +157,24 @@ export default function RecurrenciaMap({ puntos, etiquetas }) {
     [puntos]
   );
 
-  // Capas territoriales y filtro por polígono (clic sobre un distrito,
-  // circuito o barrio).
-  const { activas, datos, alternar } = useCapas();
-  const resumenes = useResumenes(datos, activas, ubicables);
-  const [foco, setFoco] = useState(null);
-  // Si se apaga la capa del polígono elegido, el filtro deja de tener sentido.
-  const focoVigente = foco && activas.includes(foco.clave) ? foco : null;
+  // Capas territoriales y filtros por distrito, circuito y barrio (desde los
+  // desplegables o con un clic sobre el polígono). Se combinan: quedan los
+  // puntos que caen dentro de todos los polígonos elegidos.
+  const capas = useCapas();
+  const resumenes = useResumenes(capas, ubicables);
+  const { elegidas } = capas;
+  const hayFiltro = elegidas.length > 0;
+  const claveFiltro = elegidas.map((e) => `${e.clave}:${e.feature.properties._i}`).join("|");
   const visibles = useMemo(
-    () => (focoVigente ? ubicables.filter((p) => contiene(focoVigente.feature, p)) : ubicables),
-    [ubicables, focoVigente]
+    () => (hayFiltro ? ubicables.filter((p) => elegidas.every((e) => contiene(e.feature, p))) : ubicables),
+    // `elegidas` es un array nuevo en cada render; su identidad real es claveFiltro.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ubicables, claveFiltro]
   );
-  const resumenFoco = {
+  const resumenFiltro = {
     puntos: visibles.length,
     total: visibles.reduce((acc, p) => acc + (p.svAcumulados || 0), 0),
   };
-  const elegirFoco = (clave, feature) =>
-    setFoco((f) =>
-      f && f.clave === clave && f.i === feature.properties._i
-        ? null // segundo clic sobre el mismo: se suelta
-        : { clave, i: feature.properties._i, feature, nombre: feature.properties.nombre || "Sin nombre" }
-    );
 
   // Los que tienen señal se dibujan ÚLTIMOS para que queden por encima de los
   // grises y no se pierdan detrás de ellos.
@@ -189,7 +186,7 @@ export default function RecurrenciaMap({ puntos, etiquetas }) {
   // El dispositivo con más incidentes se señala con un anillo amarillo. El
   // color de relleno NO se toca: sigue siendo el de su clase, como exige el §5.
   // El §7 avala justamente esto: un marcador adicional en vez de otro color.
-  // Con un polígono elegido, el máximo es el de esa zona.
+  // Con un filtro territorial, el máximo es el de esa zona.
   const maximo = visibles.reduce(
     (mejor, p) => (!mejor || p.svAcumulados > mejor.svAcumulados ? p : mejor),
     null
@@ -227,15 +224,7 @@ export default function RecurrenciaMap({ puntos, etiquetas }) {
         </button>
       </div>
 
-      <SelectorCapas
-        activas={activas}
-        datos={datos}
-        alternar={alternar}
-        foco={focoVigente}
-        onQuitarFoco={() => setFoco(null)}
-        resumenFoco={resumenFoco}
-        etiquetaTotal={textos.acumulados}
-      />
+      <SelectorCapas capas={capas} resumen={resumenFiltro} etiquetaTotal={textos.acumulados} />
 
       <div className="map-shell">
         <MapContainer center={CENTRO} zoom={ZOOM} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
@@ -247,16 +236,9 @@ export default function RecurrenciaMap({ puntos, etiquetas }) {
             url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
             maxZoom={19}
           />
-          <AjustarVista puntos={ubicables} enFoco={Boolean(focoVigente)} />
+          <AjustarVista puntos={ubicables} enFoco={hayFiltro} />
           <Redimensionar />
-          <CapasEnMapa
-            activas={activas}
-            datos={datos}
-            resumenes={resumenes}
-            foco={focoVigente}
-            onFoco={elegirFoco}
-            etiquetaTotal={textos.acumulados}
-          />
+          <CapasEnMapa capas={capas} resumenes={resumenes} etiquetaTotal={textos.acumulados} />
 
           {ordenados.map((p) => {
             const estilo = estiloPunto(p);
