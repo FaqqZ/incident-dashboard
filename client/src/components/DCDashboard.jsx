@@ -30,6 +30,17 @@ const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 // Con Desde/Hasta, elegir solo "Desde: enero" mostraba el acumulado del año.
 const SIN_FILTROS = { dimension: "", valor: "", mes: "" };
 
+// ⚠️ TEMPORAL — apagado para la presentación a los ejecutivos (septiembre
+// 2026). Oculta los avisos de calidad de la planilla (totales que no cuadran,
+// mes rotulado distinto, etiquetas fuera del clasificador). Los problemas
+// siguen en el Excel: volver a `true` después de la presentación.
+const MOSTRAR_AVISOS_PLANILLA = false;
+
+// Mismo motivo: la etiqueta que dejó el clasificador automático ("Please
+// provide the incident description…") no se ofrece en las listas. Su denuncia
+// SIGUE sumada en los totales; solo deja de aparecer como opción.
+const enLista = (c) => MOSTRAR_AVISOS_PLANILLA || !/^please provide/i.test(c);
+
 export default function DCDashboard() {
   const [filtros, setFiltros] = useState(SIN_FILTROS);
   const [opciones, setOpciones] = useState(null);
@@ -93,7 +104,7 @@ export default function DCDashboard() {
             <label htmlFor="dc-cat">Categoría de denuncia</label>
             <select id="dc-cat" value={catSel} onChange={(e) => elegir("categoria", e.target.value)}>
               <option value="">Todas</option>
-              {(opciones?.categorias || []).map((c) => <option key={c} value={c}>{c}</option>)}
+              {(opciones?.categorias || []).filter(enLista).map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
 
@@ -133,7 +144,7 @@ export default function DCDashboard() {
         ) : (
           data && (
             <>
-              {(!m.netoCuadra || !m.totalCuadra) && (
+              {MOSTRAR_AVISOS_PLANILLA && (!m.netoCuadra || !m.totalCuadra) && (
                 <div className="banner-error" style={{ marginBottom: 16 }}>
                   <strong>Los totales de la planilla no cuadran.</strong> La suma de las filas
                   no coincide con el “Subtotal operativo neto” o el “Total general” que trae la
@@ -142,7 +153,7 @@ export default function DCDashboard() {
                 </div>
               )}
 
-              {m.mesesEnConflicto.length > 0 && (
+              {MOSTRAR_AVISOS_PLANILLA && m.mesesEnConflicto.length > 0 && (
                 <div className="banner-warning" style={{ marginBottom: 16 }}>
                   <strong>Un mes está rotulado distinto en cada matriz.</strong>{" "}
                   {m.mesesEnConflicto.map((c) => (
@@ -159,7 +170,7 @@ export default function DCDashboard() {
                 </div>
               )}
 
-              {m.fueraDeTaxonomia.length > 0 && (
+              {MOSTRAR_AVISOS_PLANILLA && m.fueraDeTaxonomia.length > 0 && (
                 <div className="banner-warning" style={{ marginBottom: 16 }}>
                   <strong>
                     {m.fueraDeTaxonomia.length} etiquetas quedaron fuera de las 16 categorías del
@@ -312,7 +323,7 @@ export default function DCDashboard() {
                       ver cómo cambió la composición.
                     </div>
                   ) : (
-                    <EvolucionApilada series={data.serieCategorias} tope={8}
+                    <EvolucionApilada enLista={enLista} series={data.serieCategorias} tope={8}
                       seleccionado={catSel} />
                   )}
                 </div>

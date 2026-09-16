@@ -50,7 +50,7 @@ const PALETA = [
 const OTRAS = "var(--ink-3)";
 const TODAS = "__todas";
 
-export default function EvolucionApilada({ series, tope = 6, seleccionado = "" }) {
+export default function EvolucionApilada({ series, tope = 6, seleccionado = "", enLista = () => true }) {
   const ids = useIdsGrafico();
   const idSelect = useId();
   const principal = series?.[0]?.tipo || "";
@@ -106,7 +106,7 @@ export default function EvolucionApilada({ series, tope = 6, seleccionado = "" }
           value={vistaTodas ? TODAS : serie.tipo}
           onChange={(e) => setElegida(e.target.value)}
         >
-          {series.map((s, i) => (
+          {series.map((s, i) => enLista(s.tipo) && (
             <option key={s.tipo} value={s.tipo}>
               {s.tipo} · {nf(s.total)}{i === 0 ? " (principal)" : ""}
             </option>
